@@ -835,7 +835,6 @@ export default class ChatTopbar {
   private isJoinStreamNeeded(peerId: PeerId): boolean {
     const chatId = peerId.toChatId();
     const chat = apiManagerProxy.getChat(chatId);
-    console.error('AAAAAAAA', chat);
 
     return !!(chat as MTChat.chat)?.pFlags?.call_active;
   }
@@ -994,11 +993,9 @@ export default class ChatTopbar {
 
       // PopupElement.createPopup(PopupStreamSettings, 'stream-with', {
       //   titleLangKey: 'DiscardVoiceMessageTitle',
-      //   // descriptionLangKey: 'DiscardVoiceMessageDescription',
-      //   descriptionRaw: 'To stream video with another app, enter these Server URL and Stream Key in your streaming app. Software encoding recommended (×264 in OBS).', // TODO
       //   mainButton: {
       //     // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
-      //     text: tempText, // i18n(' TODO TODO TODO ') TODO: add Start Streaming
+      //     text: tempText, // TODO: add Start Streaming i18n and remove this
       //     noRipple: true,
       //     callback: () => {
       //       console.error('AAAAAAAA FIX ME')

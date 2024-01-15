@@ -204,8 +204,6 @@ export default class AppMediaViewerStream extends EventListenerBase<{
         container.replaceChildren();
       }
 
-      console.error('AAAAAAA fsefsefsefsefs');
-
       this.setNewMover();
 
       this.toggleOverlay(true);

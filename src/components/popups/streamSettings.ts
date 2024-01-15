@@ -1,19 +1,14 @@
 import PopupElement, {PopupButton, PopupOptions} from '.';
-import setInnerHTML from '../../helpers/dom/setInnerHTML';
 import {LangPackKey, i18n} from '../../lib/langPack';
-import wrapEmojiText from '../../lib/richTextProcessor/wrapEmojiText';
 import ButtonMenuToggle from '../buttonMenuToggle';
 
 export type PopupStreamOptions = PopupOptions & Partial<{
   peerId: PeerId,
   titleLangKey: LangPackKey,
   titleLangArgs: any[],
-  description: Parameters<typeof setInnerHTML>[1] | true,
-  descriptionRaw: string,
-  descriptionLangKey: LangPackKey,
-  descriptionLangArgs: any[],
   bodyButtons: Array<PopupButton>,
-  mainButton: PopupButton
+  mainButton: PopupButton,
+  isStartStream: boolean
 }>;
 
 export default class PopupStreamSettings extends PopupElement {
@@ -30,22 +25,17 @@ export default class PopupStreamSettings extends PopupElement {
       body: true
     });
 
-    //* description
+    //* body
     const fragment = document.createDocumentFragment();
-    if(options.descriptionLangKey || options.description || options.descriptionRaw) {
-      const p = this.description = document.createElement('p');
-      p.classList.add('popup-description');
-      if(options.descriptionLangKey) p.append(i18n(options.descriptionLangKey, options.descriptionLangArgs));
-      else if(options.description && options.description !== true) setInnerHTML(p, options.description);
-      else if(options.descriptionRaw) p.append(wrapEmojiText(options.descriptionRaw));
 
-      fragment.append(p);
-    }
-    this.header.after(fragment);
+    this.setText(fragment, 'To stream video with another app, enter these Server URL and Stream Key in your streaming app. Software encoding recommended (×264 in OBS).')
+    this.setText(fragment, 'Once you start broadcasting in your streaming app, click Start Streaming below.')
+
+    this.body.after(fragment);
 
     //* main button
     this.btnMain =  this.buttonsEl.getElementsByClassName('btn')[0] as HTMLButtonElement;
-    if(!options.mainButton?.isDanger) {
+    if(!options?.isStartStream) {
       this.btnMain.classList.remove('primary');
       this.btnMain.classList.add('start');
     } else {
@@ -53,6 +43,7 @@ export default class PopupStreamSettings extends PopupElement {
       this.btnMain.classList.add('end');
     }
 
+    //* more button
     this.btnMore = ButtonMenuToggle({
       listenerSetter: this.listenerSetter,
       direction: 'bottom-left',
@@ -67,7 +58,14 @@ export default class PopupStreamSettings extends PopupElement {
     });
 
     this.header.append(this.btnMore);
+  }
 
-    // console.error('AAAA butts',);
+  private setText(appendTo: DocumentFragment, text:/* LangPackKey */ string) {
+    const description = document.createElement('p');
+    description.classList.add('text');
+
+    // TODO: should be a call to i18n
+    description.innerText = text;
+    appendTo.append(description);
   }
 }

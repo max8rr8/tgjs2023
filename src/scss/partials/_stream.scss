@@ -58,6 +58,22 @@
 
 .popup-stream {
 
+    .popup-header {
+        
+        .popup-title {
+            margin-block: 0;
+        }
+    }
+
+    .popup-body {
+
+        .text {
+
+            font-size: var(--font-size-16);
+            line-height: var(--line-height-16);
+        }
+    }
+
     .popup-buttons {
                 
         .popup-button {

@@ -43,7 +43,6 @@ export default class ChatJoinStream extends PinnedContainer {
     // TODO:
     // const listenerSetter = this.listenerSetter = new ListenerSetter();
     // listenerSetter.add(rootScope)('group_call_update', (groupCall) => {
-    //   console.log('AaAAAA*****AAAA', groupCall);
     //   this.updateParticipantsCount((groupCall as GroupCall.groupCall).participants_count)
     // });
     // TEMP:
@@ -76,7 +75,7 @@ export default class ChatJoinStream extends PinnedContainer {
     try {
       this.appMediaViewerStream.openMedia({fromId: peerId});
     } catch(e) {
-      console.error('AAAAAAAA eee', e)
+      console.error(e)
     }
   }
 }
