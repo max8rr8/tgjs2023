@@ -708,6 +708,8 @@ export default class AppMediaViewerBase<
       cancelEvent(e);
     }
 
+    console.error('AAAAAA  0 AAA', this.target)
+
     if(this.setMoverAnimationPromise) return Promise.reject();
 
     this.closing = true;
@@ -1295,6 +1297,7 @@ export default class AppMediaViewerBase<
   protected toggleWholeActive(active: boolean) {
     if(active) {
       this.wholeDiv.classList.add('active');
+      console.error('AAAAAA, moving', this.navigationItem)
     } else {
       this.wholeDiv.classList.add('backwards');
       setTimeout(() => {

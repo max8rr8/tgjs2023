@@ -3077,35 +3077,9 @@ export class AppDialogsManager {
     });
   }
 
-  private getLastMessageForDialog(dialog: AnyDialog, lastMessage?: Message.message | Message.messageService) {
-    let draftMessage: MyDraftMessage;
-    const {peerId, draft} = dialog as Dialog;
-    if(!lastMessage) {
-      if(
-        draft?._ === 'draftMessage' && (
-          !peerId.isAnyChat() ||
-          isForumTopic(dialog) ||
-          !apiManagerProxy.isForum(peerId)
-        )
-      ) {
-        draftMessage = draft;
-      }
-
-      lastMessage = (dialog as Dialog).topMessage;
-      if(lastMessage?.mid !== dialog.top_message) {
-        const trueLastMessage = apiManagerProxy.getMessageByPeer(peerId, dialog.top_message);
-        if(trueLastMessage && (trueLastMessage as Message.messageService).action?._ !== 'messageActionChannelJoined') {
-          lastMessage = trueLastMessage;
-        }
-      }
-    }
-
-    return {lastMessage, draftMessage};
-  }
-
   private async setLastMessage({
     dialog,
-    lastMessage: _lastMessage,
+    lastMessage,
     dialogElement,
     highlightWord,
     isBatch = false,
@@ -3134,7 +3108,27 @@ export class AppDialogsManager {
 
     const {deferred: promise, middleware} = setPromiseMiddleware(dom, 'setLastMessagePromise');
 
-    const {draftMessage, lastMessage} = this.getLastMessageForDialog(dialog, _lastMessage);
+    let draftMessage: MyDraftMessage;
+    if(!lastMessage) {
+      const {draft} = dialog as Dialog;
+      if(
+        draft?._ === 'draftMessage' && (
+          !peerId.isAnyChat() ||
+          isForumTopic(dialog) ||
+          !apiManagerProxy.isForum(peerId)
+        )
+      ) {
+        draftMessage = draft;
+      }
+
+      lastMessage = (dialog as Dialog).topMessage;
+      if(lastMessage?.mid !== dialog.top_message) {
+        const trueLastMessage = apiManagerProxy.getMessageByPeer(peerId, dialog.top_message);
+        if(trueLastMessage && (trueLastMessage as Message.messageService).action?._ !== 'messageActionChannelJoined') {
+          lastMessage = trueLastMessage;
+        }
+      }
+    }
 
     const isSearch = setUnread !== null && !setUnread;
     // * do not uncomment `setUnread` - unsetTyping right after this call will interrupt setting unread badges
@@ -3338,7 +3332,7 @@ export class AppDialogsManager {
     const {peerId} = dialog;
     const promises = Promise.all([
       this.managers.appNotificationsManager.isPeerLocalMuted({peerId: peerId, respectType: true, threadId: isTopic ? dialog.id : undefined}),
-      !isSaved ? this.getLastMessageForDialog(dialog) : undefined,
+      !isSaved && dialog.draft?._ !== 'draftMessage' ? apiManagerProxy.getMessageByPeer(peerId, dialog.top_message) : undefined,
       isTopic || isSaved ? !!dialog.pFlags.pinned : this.managers.dialogsStorage.isDialogPinned(peerId, this.filterId),
       this.managers.appMessagesManager.isDialogUnread(dialog),
       peerId.isAnyChat() && !isTopic ? this.managers.acknowledged.dialogsStorage.getForumUnreadCount(peerId).then((result) => {
@@ -3354,14 +3348,13 @@ export class AppDialogsManager {
       }).catch(() => undefined as {count: number, hasUnmuted: boolean}) : undefined
     ]);
 
-    let [isMuted, m, isPinned, isDialogUnread, forumUnreadCount] = await middleware(promises);
+    let [isMuted, lastMessage, isPinned, isDialogUnread, forumUnreadCount] = await middleware(promises);
     const wasMuted = dom.listEl.classList.contains('is-muted') && !dom.listEl.classList.contains('backwards');
 
     const {count: unreadTopicsCount, hasUnmuted: hasUnmutedTopic} = forumUnreadCount || {};
 
-    const {draftMessage, lastMessage} = m || {};
     let setStatusMessage: MyMessage;
-    if(!draftMessage && lastMessage && lastMessage.pFlags.out && lastMessage.peerId !== rootScope.myId) {
+    if(lastMessage && lastMessage.pFlags.out && lastMessage.peerId !== rootScope.myId) {
       setStatusMessage = lastMessage;
     }
 

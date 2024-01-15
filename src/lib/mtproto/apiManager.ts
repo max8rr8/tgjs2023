@@ -91,7 +91,7 @@ export class ApiManager extends ApiManagerMethods {
 
     this.transportType = Modes.transport;
 
-    if(import.meta.env.VITE_MTPROTO_AUTO && Modes.multipleTransports) {
+    if(import.meta.env.VITE_MTPROTO_AUTO) {
       transportController.addEventListener('transport', (transportType) => {
         this.changeTransportType(transportType);
       });

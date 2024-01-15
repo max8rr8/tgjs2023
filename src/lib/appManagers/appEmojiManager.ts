@@ -259,8 +259,6 @@ export class AppEmojiManager extends AppManager {
           docId: doc.id
         });
       });
-    }, () => {
-      return new Array(docIds.length).fill(undefined);
     });
   }
 

@@ -16,6 +16,7 @@ import ButtonIcon from '../buttonIcon';
 import ButtonMenuToggle from '../buttonMenuToggle';
 import ChatAudio from './audio';
 import ChatPinnedMessage from './pinnedMessage';
+import ChatJoinStream from './stream';
 import ListenerSetter from '../../helpers/listenerSetter';
 import PopupDeleteDialog from '../popups/deleteDialog';
 import appNavigationController from '../appNavigationController';
@@ -58,6 +59,7 @@ import createBadge from '../../helpers/createBadge';
 import PopupBoostsViaGifts from '../popups/boostsViaGifts';
 import AppStatisticsTab from '../sidebarRight/tabs/statistics';
 import {ChatType} from './chat';
+import PopupStreamSettings from '../popups/streamSettings';
 
 type ButtonToVerify = {element?: HTMLElement, verify: () => boolean | Promise<boolean>};
 
@@ -85,6 +87,7 @@ export default class ChatTopbar {
   private chatRequests: ChatRequests;
   private chatAudio: ChatAudio;
   public pinnedMessage: ChatPinnedMessage;
+  public joinStream: ChatJoinStream;
 
   private setUtilsRAF: number;
 
@@ -161,6 +164,7 @@ export default class ChatTopbar {
     this.chatAudio = new ChatAudio(this, this.chat, this.managers);
     this.chatRequests = new ChatRequests(this, this.chat, this.managers);
     this.chatActions = new ChatActions(this, this.chat, this.managers);
+    this.joinStream = new ChatJoinStream(this, this.chat, this.managers);
 
     if(this.menuButtons.length) {
       this.btnMore = ButtonMenuToggle({
@@ -210,6 +214,10 @@ export default class ChatTopbar {
 
     if(this.chatActions) {
       this.container.append(this.chatActions.divAndCaption.container);
+    }
+
+    if(this.joinStream) {
+      this.container.append(this.joinStream.divAndCaption.container);
     }
 
     // * construction end
@@ -824,6 +832,14 @@ export default class ChatTopbar {
     }
   }
 
+  private isJoinStreamNeeded(peerId: PeerId): boolean {
+    const chatId = peerId.toChatId();
+    const chat = apiManagerProxy.getChat(chatId);
+    console.error('AAAAAAAA', chat);
+
+    return !!(chat as MTChat.chat)?.pFlags?.call_active;
+  }
+
   private appendPinnedMessage(pinnedMessage: ChatPinnedMessage) {
     const container = pinnedMessage.pinnedMessageContainer.divAndCaption.container;
     if(this.pinnedMessage && this.pinnedMessage !== pinnedMessage) {
@@ -959,6 +975,39 @@ export default class ChatTopbar {
         this.pinnedMessage = undefined;
       }
 
+      const isJoinStreamNeeded = this.isJoinStreamNeeded(peerId);
+      this.joinStream.toggle(!isJoinStreamNeeded);
+      if(isJoinStreamNeeded) {
+        this.attachClickEvent(this.joinStream.btnJoin, () => {
+          this.onJoinGroupCallClick();
+          // this.joinStream.openStreamWindow(peerId);
+          // fix flags to math channels only,
+          // now it's catching all calls, ig
+          // this.joinStream.toggle(true);
+        })
+      }
+
+      const tempText = document.createElement('p')
+      tempText.innerText = 'Start Streaming';
+      const tempTitle = document.createElement('p');
+      tempTitle.innerText = 'Stream With...'
+
+      // PopupElement.createPopup(PopupStreamSettings, 'stream-with', {
+      //   titleLangKey: 'DiscardVoiceMessageTitle',
+      //   // descriptionLangKey: 'DiscardVoiceMessageDescription',
+      //   descriptionRaw: 'To stream video with another app, enter these Server URL and Stream Key in your streaming app. Software encoding recommended (×264 in OBS).', // TODO
+      //   mainButton: {
+      //     // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
+      //     text: tempText, // i18n(' TODO TODO TODO ') TODO: add Start Streaming
+      //     noRipple: true,
+      //     callback: () => {
+      //       console.error('AAAAAAAA FIX ME')
+      //     }
+      //   },
+      //   closable: true,
+      //   title: tempTitle // TODO: use langPackKey, but first add it somewhere...
+      // }).show();
+
       setTitleCallback();
       setStatusCallback?.();
       this.subtitle.classList.toggle('hide', !setStatusCallback);
@@ -1032,7 +1081,7 @@ export default class ChatTopbar {
       if(count === undefined) {
         const historyStorage = await this.chat.getHistoryStorage();
         if(!middleware()) return;
-        el.compareAndUpdate(historyStorage.count === null ? {key: 'Loading', args: undefined} : {args: [historyStorage.count]});
+        el.compareAndUpdate({args: [historyStorage.count]});
       }
 
       titleEl = el.element;
@@ -1106,6 +1155,7 @@ export default class ChatTopbar {
   public setFloating = () => {
     const containers = [
       this.chatAudio,
+      this.joinStream,
       this.chatRequests,
       this.chatActions,
       this.pinnedMessage?.pinnedMessageContainer
@@ -1132,7 +1182,7 @@ export default class ChatTopbar {
     const historyStorageKey = this.chat.historyStorageKey;
     const onHistoryCount: (data: BroadcastEvents['history_count']) => void = ({historyKey, count}) => {
       if(historyStorageKey === historyKey) {
-        el.compareAndUpdate({key, args: [count]});
+        el.compareAndUpdate({args: [count]});
       }
     };
 

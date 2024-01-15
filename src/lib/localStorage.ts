@@ -11,7 +11,6 @@
 
 import Modes from '../config/modes';
 import {IS_WORKER} from '../helpers/context';
-import makeError from '../helpers/makeError';
 import {WorkerTaskTemplate} from '../types';
 import MTProtoMessagePort from './mtproto/mtprotoMessagePort';
 // import { stringify } from '../helpers/json';
@@ -36,7 +35,6 @@ class LocalStorage<Storage extends Record<string, any>> {
         value = localStorage.getItem(this.prefix + (key as string)) as any;
       } catch(err) {
         this.useStorage = false;
-        throw makeError('STORAGE_OFFLINE');
       }
 
       if(value !== null) {
@@ -50,36 +48,26 @@ class LocalStorage<Storage extends Record<string, any>> {
       }
 
       return value;
-    } else {
-      throw makeError('STORAGE_OFFLINE');
-    }
+    }/*  else {
+      throw 'something went wrong';
+    } */
   }
 
   public set(obj: Partial<Storage>, onlyLocal = false) {
-    let lastError: any;
     for(const key in obj) {
       if(obj.hasOwnProperty(key)) {
         const value = obj[key];
         this.cache[key] = value;
 
-        if(!onlyLocal) {
+        if(this.useStorage && !onlyLocal) {
           try {
-            if(!this.useStorage) {
-              throw makeError('STORAGE_OFFLINE');
-            }
-
             const stringified = JSON.stringify(value);
             localStorage.setItem(this.prefix + key, stringified);
           } catch(err) {
             this.useStorage = false;
-            lastError = err;
           }
         }
       }
-    }
-
-    if(lastError) {
-      throw lastError;
     }
   }
 

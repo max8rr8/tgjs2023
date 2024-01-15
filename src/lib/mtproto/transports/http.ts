@@ -79,7 +79,7 @@ export default class HTTP implements MTTransport {
 
     this.connected = connected;
 
-    if(import.meta.env.VITE_MTPROTO_AUTO && Modes.multipleTransports) {
+    if(import.meta.env.VITE_MTPROTO_AUTO) {
       transportController.setTransportValue('https', connected);
     }
   }
