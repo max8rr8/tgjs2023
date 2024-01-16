@@ -59,7 +59,7 @@ import createBadge from '../../helpers/createBadge';
 import PopupBoostsViaGifts from '../popups/boostsViaGifts';
 import AppStatisticsTab from '../sidebarRight/tabs/statistics';
 import {ChatType} from './chat';
-import PopupStreamSettings from '../popups/streamSettings';
+import PopupStreamControl from '../popups/streamSettings';
 
 type ButtonToVerify = {element?: HTMLElement, verify: () => boolean | Promise<boolean>};
 
@@ -986,24 +986,50 @@ export default class ChatTopbar {
         })
       }
 
-      const tempText = document.createElement('p')
-      tempText.innerText = 'Start Streaming';
-      const tempTitle = document.createElement('p');
-      tempTitle.innerText = 'Stream With...'
+      // TODO: two popups down there are responsible
+      // for stream start/end. Yet to be removed.
 
-      // PopupElement.createPopup(PopupStreamSettings, 'stream-with', {
+      // const tempText0 = document.createElement('p')
+      // tempText0.innerText = 'Start Streaming';
+      // const tempTitle0 = document.createElement('span');
+      // tempTitle0.innerText = 'Stream With...'
+
+      // PopupElement.createPopup(PopupStreamControl, 'stream-with', {
       //   titleLangKey: 'DiscardVoiceMessageTitle',
       //   mainButton: {
       //     // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
-      //     text: tempText, // TODO: add Start Streaming i18n and remove this
+      //     text: tempText0, // TODO: add Start Streaming i18n and remove this
       //     noRipple: true,
       //     callback: () => {
       //       console.error('AAAAAAAA FIX ME')
       //     }
       //   },
       //   closable: true,
-      //   title: tempTitle // TODO: use langPackKey, but first add it somewhere...
+      //   title: tempTitle0, // TODO: use langPackKey, but first add it somewhere...
+      //   isStartStream: true
       // }).show();
+
+      // const tempText1 = document.createElement('p')
+      // tempText1.innerText = 'End Live Stream';
+      // const tempTitle1 = document.createElement('span');
+      // tempTitle1.innerText = 'Stream Settings'
+
+
+      // PopupElement.createPopup(PopupStreamControl, 'stream-settings', {
+      //   titleLangKey: 'DiscardVoiceMessageTitle',
+      //   mainButton: {
+      //     // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
+      //     text: tempText1, // TODO: add Start Streaming i18n and remove this
+      //     noRipple: true,
+      //     callback: () => {
+      //       console.error('AAAAAAAA FIX ME')
+      //     }
+      //   },
+      //   closable: true,
+      //   title: tempTitle1, // TODO: use langPackKey, but first add it somewhere...
+      //   isStartStream: false
+      // }).show();
+
 
       setTitleCallback();
       setStatusCallback?.();

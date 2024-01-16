@@ -1,0 +1,128 @@
+
+.popup-stream {
+
+    --spacing: 1rem;
+    --half-spacing: 0.5rem;
+
+    &-container {
+        --popup-min-width: 19.5rem;
+        --popup-max-width: 26rem;
+    }
+
+    .popup-container {
+        padding: var(--half-spacing);
+        width: 26rem;
+        border-radius: 16px;
+    }
+
+    .control-element {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+
+        .copy-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            margin-inline: var(--spacing);
+        }
+
+        .row-subtitle {
+            pointer-events: all
+        }
+    }
+
+    .popup-header {
+
+        margin-bottom: var(--spacing);
+        
+        .popup-close {
+            margin-inline-start: var(--half-spacing);
+        }
+
+        .more {
+            margin-inline-end: var(--spacing)   ;
+        } 
+    }
+
+    .popup-body {
+
+        .red {
+
+            &:hover::after { 
+                content: ' ';
+                border-radius: 16px;
+                margin: 0 -var(--spacing) 0.2rem var(--spacing);
+                position: absolute;
+                z-index: 10 !important;
+                top: 0;
+                left: var(--half-spacing);
+                width: calc(100% - var(--spacing));
+                height: 100%;
+                background-color: var(--light-danger-color);
+            }
+
+            .row-icon {
+                color: var(--danger-color);
+            }
+
+            .row-title {
+                color: var(--danger-color);
+            }
+        }
+
+        .text {
+            max-width: fit-content;
+            min-width: min(100%, 15rem);
+            
+            padding-inline: var(--spacing);
+
+            font-size: var(--font-size-16);
+            line-height: var(--line-height-16);
+            color: var(--secondary-text-color);
+            font-weight: var(--font-weight-regular);
+        
+            margin-block: var(--spacing);
+        }
+
+        .toggle-visible {
+            margin-left: 0.5rem;
+            vertical-align: middle;
+
+        }
+    }
+
+    .popup-buttons {
+        margin-top: var(--spacing);
+        margin-bottom: 0.5rem;
+                
+        .popup-button {
+
+            width: 100%;
+            height: 100%;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            &.start {
+                background-color: var(--primary-color);
+
+                &:hover {
+                    @include hover-background-effect(primary);
+                    color: var(--primary-color)
+                }
+
+            } 
+            
+            &.end { 
+                background-color: var(--danger-color);
+            
+                &:hover {
+                    @include hover-background-effect(red);
+                    color: var(--danger-color)
+                }
+            }
+        }
+         
+    }
+}
