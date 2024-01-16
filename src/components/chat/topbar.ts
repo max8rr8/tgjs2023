@@ -59,7 +59,7 @@ import createBadge from '../../helpers/createBadge';
 import PopupBoostsViaGifts from '../popups/boostsViaGifts';
 import AppStatisticsTab from '../sidebarRight/tabs/statistics';
 import {ChatType} from './chat';
-import PopupStreamControl from '../popups/streamSettings';
+import PopupStreamControl from '../popups/streamControl';
 
 type ButtonToVerify = {element?: HTMLElement, verify: () => boolean | Promise<boolean>};
 
@@ -635,7 +635,26 @@ export default class ChatTopbar {
   }
 
   private onJoinGroupCallClick = () => {
-    this.chat.appImManager.joinGroupCall(this.peerId);
+    const tempText0 = document.createElement('p')
+    tempText0.innerText = 'Start Streaming';
+    const tempTitle0 = document.createElement('span');
+    tempTitle0.innerText = 'Stream With...'
+
+    PopupElement.createPopup(PopupStreamControl, 'stream-with', {
+      titleLangKey: 'DiscardVoiceMessageTitle',
+      mainButton: {
+        // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
+        text: tempText0, // TODO: add Start Streaming i18n and remove this
+        noRipple: true,
+        callback: () => {
+          console.error('AAAAAAAA FIX ME')
+          this.chat.appImManager.joinGroupCall(this.peerId);
+        }
+      },
+      closable: true,
+      title: tempTitle0, // TODO: use langPackKey, but first add it somewhere...
+      isStartStream: true
+    }).show();
   };
 
   private get peerId() {
@@ -991,10 +1010,8 @@ export default class ChatTopbar {
 
       const isJoinStreamNeeded = this.isJoinStreamNeeded();
       this.joinStream.toggle(!isJoinStreamNeeded);
-
+      this.btnGroupCall.classList.toggle('not-needed', this.chat.isBroadcast);
       if(isJoinStreamNeeded) {
-        this.btnGroupCall.classList.add('not-needed');
-        console.error('AAAAAAAAaaa', this.btnGroupCall.classList)
         this.attachClickEvent(this.joinStream.btnJoin, () => {
           this.onJoinGroupCallClick();
           // this.joinStream.openStreamWindow(peerId);
@@ -1002,33 +1019,10 @@ export default class ChatTopbar {
           // now it's catching all calls, ig
           // this.joinStream.toggle(true);
         })
-      } else {
-        this.btnGroupCall.classList.remove('not-needed');
       }
 
-      // TODO: two popups down there are responsible
-      // for stream start/end. Yet to be removed.
-
-      // const tempText0 = document.createElement('p')
-      // tempText0.innerText = 'Start Streaming';
-      // const tempTitle0 = document.createElement('span');
-      // tempTitle0.innerText = 'Stream With...'
-
-      // PopupElement.createPopup(PopupStreamControl, 'stream-with', {
-      //   titleLangKey: 'DiscardVoiceMessageTitle',
-      //   mainButton: {
-      //     // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
-      //     text: tempText0, // TODO: add Start Streaming i18n and remove this
-      //     noRipple: true,
-      //     callback: () => {
-      //       console.error('AAAAAAAA FIX ME')
-      //     }
-      //   },
-      //   closable: true,
-      //   title: tempTitle0, // TODO: use langPackKey, but first add it somewhere...
-      //   isStartStream: true
-      // }).show();
-
+      // // TODO: popup down there is responsible
+      // // for stream end. Yet to be removed.
       // const tempText1 = document.createElement('p')
       // tempText1.innerText = 'End Live Stream';
       // const tempTitle1 = document.createElement('span');
