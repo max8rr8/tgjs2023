@@ -832,11 +832,21 @@ export default class ChatTopbar {
     }
   }
 
-  private isJoinStreamNeeded(peerId: PeerId): boolean {
-    const chatId = peerId.toChatId();
-    const chat = apiManagerProxy.getChat(chatId);
+  private isJoinStreamNeeded(): boolean {
+    if(!IS_GROUP_CALL_SUPPORTED || this.peerId.isUser() || this.chat.type !== ChatType.Chat || this.chat.threadId) return false;
 
-    return !!(chat as MTChat.chat)?.pFlags?.call_active;
+    const currentGroupCall = groupCallsController.groupCall;
+    const chatId = this.peerId.toChatId();
+    if(currentGroupCall?.chatId === chatId) {
+      return false;
+    }
+
+    if(this.chat.isAnyGroup || !this.chat.isBroadcast) {
+      return false;
+    }
+
+    const chat = apiManagerProxy.getChat(chatId);
+    return (chat as MTChat.chat).pFlags?.call_active;
   }
 
   private appendPinnedMessage(pinnedMessage: ChatPinnedMessage) {
@@ -974,7 +984,7 @@ export default class ChatTopbar {
         this.pinnedMessage = undefined;
       }
 
-      const isJoinStreamNeeded = this.isJoinStreamNeeded(peerId);
+      const isJoinStreamNeeded = this.isJoinStreamNeeded();
       this.joinStream.toggle(!isJoinStreamNeeded);
       if(isJoinStreamNeeded) {
         this.attachClickEvent(this.joinStream.btnJoin, () => {
