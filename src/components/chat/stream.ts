@@ -1,6 +1,5 @@
+import {attachClickEvent} from '../../helpers/dom/clickEvent';
 import replaceContent from '../../helpers/dom/replaceContent';
-import ListenerSetter from '../../helpers/listenerSetter';
-import {GroupCall} from '../../layer';
 import {AppManagers} from '../../lib/appManagers/managers';
 import I18n, {i18n} from '../../lib/langPack';
 import rootScope from '../../lib/rootScope';
@@ -16,6 +15,13 @@ export default class ChatJoinStream extends PinnedContainer {
   private gradient: HTMLDivElement;
   private contentSubtitle: I18n.IntlElement;
   private appMediaViewerStream: AppMediaViewerStream;
+  private currChatId: ChatId;
+  private hasBtnCb: boolean;
+
+  public setCurrChatId(chatId: ChatId) {
+    this.currChatId = chatId;
+    this.updateParticipantsCount(chatId);
+  }
 
   constructor(protected topbar: ChatTopbar, protected chat: Chat, protected managers: AppManagers) {
     super({
@@ -34,19 +40,16 @@ export default class ChatJoinStream extends PinnedContainer {
     })
 
     this.appMediaViewerStream = new AppMediaViewerStream();
-
-
     this.contentSubtitle = new I18n.IntlElement({
       key: 'VoiceChat.Status.Connecting'
     });
 
     // TODO:
-    // const listenerSetter = this.listenerSetter = new ListenerSetter();
-    // listenerSetter.add(rootScope)('group_call_update', (groupCall) => {
-    //   this.updateParticipantsCount((groupCall as GroupCall.groupCall).participants_count)
-    // });
-    // TEMP:
-    this.updateParticipantsCount(Math.floor(Math.random()*100000));
+    this.listenerSetter.add(rootScope)('group_call_update', (groupCall) => {
+      if(this.currChatId) {
+        this.updateParticipantsCount(this.currChatId);
+      }
+    });
 
 
     this.btnClose.remove();
@@ -62,13 +65,22 @@ export default class ChatJoinStream extends PinnedContainer {
     this.wrapper.prepend(this.gradient);
   }
 
-  public updateParticipantsCount(count: number) {
+  public async updateParticipantsCount(chatId?: ChatId) {
     // TODO: 'connecting' status?
     this.contentSubtitle.compareAndUpdate({
       key: 'VoiceChat.Status.Members',
-      args: [count]
+      args: [await this.managers.appGroupCallsManager.getParticipantsCount(chatId)]
     });
     this.divAndCaption.fill({title: i18n('PeerInfo.Action.LiveStream'), subtitle: this.contentSubtitle.element});
+  }
+
+  // TODO: maybe there's better
+  public setBtnJoinCallback(cb: () => void) {
+    if(this.hasBtnCb) {
+      return;
+    }
+    attachClickEvent(this.btnJoin, cb);
+    this.hasBtnCb = true;
   }
 
   public openStreamWindow(peerId: PeerId) {

@@ -60,6 +60,7 @@ import PopupBoostsViaGifts from '../popups/boostsViaGifts';
 import AppStatisticsTab from '../sidebarRight/tabs/statistics';
 import {ChatType} from './chat';
 import PopupStreamControl from '../popups/streamControl';
+import {AppGroupCallsManager} from '../../lib/appManagers/appGroupCallsManager';
 
 type ButtonToVerify = {element?: HTMLElement, verify: () => boolean | Promise<boolean>};
 
@@ -82,6 +83,7 @@ export default class ChatTopbar {
   private btnMute: HTMLButtonElement;
   private btnSearch: HTMLButtonElement;
   private btnMore: HTMLElement;
+  private appGroupCallsManager: AppGroupCallsManager;
 
   private chatActions: ChatActions;
   private chatRequests: ChatRequests;
@@ -107,6 +109,7 @@ export default class ChatTopbar {
     private managers: AppManagers
   ) {
     this.listenerSetter = new ListenerSetter();
+    this.appGroupCallsManager = new AppGroupCallsManager;
 
     this.menuButtons = [];
     this.buttonsToVerify = [];
@@ -863,11 +866,15 @@ export default class ChatTopbar {
       return false;
     }
 
-    console.error('aaaaaaaa', this.chat)
-
     if(this.chat.isAnyGroup || !this.chat.isBroadcast) {
       return false;
     }
+
+    // TODO: A HUGE HUGE PIECE OF- what to be replaced
+    setTimeout(() => {
+      this.joinStream.setCurrChatId(this.peerId.toChatId())
+    }, 200);
+    //
 
     const chat = apiManagerProxy.getChat(chatId);
     return (chat as MTChat.chat).pFlags?.call_active;
@@ -1012,7 +1019,7 @@ export default class ChatTopbar {
       this.joinStream.toggle(!isJoinStreamNeeded);
       this.btnGroupCall.classList.toggle('not-needed', this.chat.isBroadcast);
       if(isJoinStreamNeeded) {
-        this.attachClickEvent(this.joinStream.btnJoin, () => {
+        this.joinStream.setBtnJoinCallback(() => {
           this.onJoinGroupCallClick();
           // this.joinStream.openStreamWindow(peerId);
           // fix flags to math channels only,
@@ -1020,6 +1027,11 @@ export default class ChatTopbar {
           // this.joinStream.toggle(true);
         })
       }
+
+      // @ts-ignore
+      rootScope.addEventListener('lalala', (call) => {
+        console.error('AAAAA', ...call, apiManagerProxy.getChat(peerId.toChatId()))
+      })
 
       // // TODO: popup down there is responsible
       // // for stream end. Yet to be removed.
