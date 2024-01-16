@@ -341,6 +341,9 @@ export default class ChatTopbar {
     }
 
     const chat = apiManagerProxy.getChat(chatId);
+    if(this.managers.appPeersManager.isBroadcast(this.peerId) && !hasRights(chat, 'manage_call')) {
+      return false;
+    }
     return (chat as MTChat.chat).pFlags?.call_active || hasRights(chat, 'manage_call');
   };
 
@@ -841,6 +844,8 @@ export default class ChatTopbar {
       return false;
     }
 
+    console.error('aaaaaaaa', this.chat)
+
     if(this.chat.isAnyGroup || !this.chat.isBroadcast) {
       return false;
     }
@@ -986,7 +991,10 @@ export default class ChatTopbar {
 
       const isJoinStreamNeeded = this.isJoinStreamNeeded();
       this.joinStream.toggle(!isJoinStreamNeeded);
+
       if(isJoinStreamNeeded) {
+        this.btnGroupCall.classList.add('not-needed');
+        console.error('AAAAAAAAaaa', this.btnGroupCall.classList)
         this.attachClickEvent(this.joinStream.btnJoin, () => {
           this.onJoinGroupCallClick();
           // this.joinStream.openStreamWindow(peerId);
@@ -994,6 +1002,8 @@ export default class ChatTopbar {
           // now it's catching all calls, ig
           // this.joinStream.toggle(true);
         })
+      } else {
+        this.btnGroupCall.classList.remove('not-needed');
       }
 
       // TODO: two popups down there are responsible
