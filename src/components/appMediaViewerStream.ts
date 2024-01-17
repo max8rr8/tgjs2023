@@ -1,5 +1,5 @@
 import IS_TOUCH_SUPPORTED from '../environment/touchSupport';
-import {IS_MOBILE_SAFARI, IS_SAFARI} from '../environment/userAgent';
+import {IS_MOBILE_SAFARI} from '../environment/userAgent';
 import cancelEvent from '../helpers/dom/cancelEvent';
 import {attachClickEvent, hasMouseMovedSinceDown} from '../helpers/dom/clickEvent';
 import createVideo from '../helpers/dom/createVideo';
@@ -9,17 +9,14 @@ import replaceContent from '../helpers/dom/replaceContent';
 import EventListenerBase from '../helpers/eventListenerBase';
 import {MiddlewareHelper, getMiddleware} from '../helpers/middleware';
 import overlayCounter from '../helpers/overlayCounter';
-import debounce from '../helpers/schedulers/debounce';
 import windowSize from '../helpers/windowSize';
 import {AppManagers} from '../lib/appManagers/managers';
-import {i18n} from '../lib/langPack';
 import VideoPlayer from '../lib/mediaPlayer';
 import {NULL_PEER_ID} from '../lib/mtproto/mtproto_config';
 import wrapEmojiText from '../lib/richTextProcessor/wrapEmojiText';
 import rootScope from '../lib/rootScope';
 import animationIntersector from './animationIntersector';
-import appMediaPlaybackController, {AppMediaPlaybackController} from './appMediaPlaybackController';
-import AppMediaViewerBase from './appMediaViewerBase';
+import appNavigationController, {NavigationItem} from './appNavigationController';
 import {avatarNew} from './avatarNew';
 import ButtonIcon from './buttonIcon';
 import ProgressivePreloader from './preloader';
@@ -48,7 +45,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   protected highlightSwitchersTimeout: number;
   protected lastGestureTime: number;
   protected isFirstOpen = true;
-  protected releaseSingleMedia: ReturnType<AppMediaPlaybackController['setSingleMedia']>;
+  protected navigationItem: NavigationItem;
 
   protected pageEl = document.getElementById('page-chats') as HTMLDivElement;
   protected videoPlayer: VideoPlayer;
@@ -205,6 +202,21 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       }
 
       this.setNewMover();
+      this.navigationItem = {
+        type: 'media',
+        onPop: (canAnimate) => {
+          if(this.setMoverAnimationPromise) {
+            return false;
+          }
+
+          if(!canAnimate && IS_MOBILE_SAFARI) {
+            this.wholeDiv.remove();
+          }
+
+          this.close();
+        }
+      };
+      appNavigationController.pushItem(this.navigationItem);
 
       this.toggleOverlay(true);
       this.setGlobalListeners();
@@ -218,8 +230,15 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
       // if(isVideo)
       const mover = this.content.mover;
+      mover.classList.add('temptemptemp');
       const middleware = mover.middlewareHelper.get();
       const video = createVideo({pip: true, middleware});
+      console.error('AAAA', mover);
+      video.src = 'stream/%7B%22dcId%22%3A2%2C%22location%22%3A%7B%22_%22%3A%22inputDocumentFileLocation%22%2C%22id%22%3A%225199710476254067157%22%2C%22access_hash%22%3A%22-1202662833049742147%22%2C%22file_reference%22%3A%5B4%2C124%2C101%2C233%2C203%2C0%2C0%2C0%2C23%2C101%2C167%2C128%2C107%2C166%2C204%2C145%2C34%2C102%2C3%2C26%2C12%2C123%2C208%2C169%2C68%2C156%2C1%2C40%2C41%5D%7D%2C%22size%22%3A4541349%2C%22mimeType%22%3A%22video%2Fmp4%22%2C%22fileName%22%3A%22IMG_9853.MOV%22%7D';
+
+      video.width = 1000;
+      video.height = 700;
+      mover.append(video);
       // const
       // TODO wtf
       mover.style.display = '';
@@ -265,6 +284,10 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
     this.closing = true;
     this.swipeHandler?.removeListeners();
+
+    if(this.navigationItem) {
+      appNavigationController.removeItem(this.navigationItem);
+    }
 
     this.author.avatarMiddlewareHelper?.destroy();
 

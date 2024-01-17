@@ -83,7 +83,6 @@ export default class ChatTopbar {
   private btnMute: HTMLButtonElement;
   private btnSearch: HTMLButtonElement;
   private btnMore: HTMLElement;
-  private appGroupCallsManager: AppGroupCallsManager;
 
   private chatActions: ChatActions;
   private chatRequests: ChatRequests;
@@ -109,7 +108,6 @@ export default class ChatTopbar {
     private managers: AppManagers
   ) {
     this.listenerSetter = new ListenerSetter();
-    this.appGroupCallsManager = new AppGroupCallsManager;
 
     this.menuButtons = [];
     this.buttonsToVerify = [];
@@ -652,6 +650,7 @@ export default class ChatTopbar {
         callback: () => {
           console.error('AAAAAAAA FIX ME')
           this.chat.appImManager.joinGroupCall(this.peerId);
+          this.joinStream.openStreamWindow(this.peerId);
         }
       },
       closable: true,
@@ -870,6 +869,7 @@ export default class ChatTopbar {
       return false;
     }
 
+    console.error('AAAAA', this.managers.appGroupCallsManager);
     // TODO: A HUGE HUGE PIECE OF- what to be replaced
     setTimeout(() => {
       this.joinStream.setCurrChatId(this.peerId.toChatId())
@@ -1021,10 +1021,6 @@ export default class ChatTopbar {
       if(isJoinStreamNeeded) {
         this.joinStream.setBtnJoinCallback(() => {
           this.onJoinGroupCallClick();
-          // this.joinStream.openStreamWindow(peerId);
-          // fix flags to math channels only,
-          // now it's catching all calls, ig
-          // this.joinStream.toggle(true);
         })
       }
 
