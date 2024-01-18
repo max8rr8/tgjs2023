@@ -343,6 +343,18 @@ export class AppGroupCallsManager extends AppManager {
     });
   }
 
+  public async getURLAndKey(peerId: PeerId, revoke: boolean) {
+    const promise = this.apiManager.invokeApi('phone.getGroupCallStreamRtmpUrl', {
+      peer: this.appPeersManager.getInputPeerById(peerId),
+      revoke
+    })
+    .then((rtmpURL) => {
+      return rtmpURL
+    }).catch((error) => {
+    })
+    return promise;
+  }
+
   public async joinGroupCall(groupCallId: GroupCallId, params: DataJSON, options: GroupCallConnectionInstance['options']) {
     const groupCallInput = this.getGroupCallInput(groupCallId);
     let promise: Promise<Updates>;

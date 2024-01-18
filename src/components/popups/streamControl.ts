@@ -15,7 +15,9 @@ export type PopupStreamOptions = PopupOptions & Partial<{
   titleLangArgs: any[],
   bodyButtons: Array<PopupButton>,
   mainButton: PopupButton,
-  isStartStream: boolean
+  isStartStream: boolean,
+  serverURL: string,
+  streamKey: string
 }>;
 
 export default class PopupStreamControl extends PopupElement {
@@ -26,18 +28,20 @@ export default class PopupStreamControl extends PopupElement {
   private passwordEl: HTMLDivElement;
 
   private menuButtons: Parameters<typeof ButtonMenuToggle>[0]['buttons'];
+  private serverURL: string;
+  private streamKey: string;
 
-  // TODO
-  get serverURL(): string {
-    const url = 'rtmps://dc4-1.rtmp.t.me/s/';
-    return url;
-  }
+  // // TODO
+  // get serverURL(): string {
+  //   const url = 'rtmps://dc4-1.rtmp.t.me/s/';
+  //   return url;
+  // }
 
-  // TODO
-  get streamKey(): string {
-    const key = 'some-stream-key';
-    return key;
-  }
+  // // TODO
+  // get streamKey(): string {
+  //   const key = 'some-stream-key';
+  //   return key;
+  // }
 
   // TODO: desctuctor !!!!!!!!!!!!
 
@@ -48,6 +52,15 @@ export default class PopupStreamControl extends PopupElement {
       buttons: [options.mainButton],
       body: true
     });
+    try {
+      console.error('AAAA ==== =', this.managers.appGroupCallsManager.getURLAndKey, options.peerId)
+    } catch(e) {
+      console.error('AAAA ERROR ', e)
+    }
+
+    this.serverURL = options.serverURL;
+    this.streamKey = options.streamKey;
+
 
     //* TODO: more button
     this.btnMore = ButtonMenuToggle({
@@ -81,7 +94,6 @@ export default class PopupStreamControl extends PopupElement {
       icon: 'lock',
       isKey: true
     })
-
     if(options?.isStartStream) {
       this.addText(fragment, 'Once you start broadcasting in your streaming app, click Start Streaming below.')
     } else {
