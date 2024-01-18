@@ -109,6 +109,12 @@ $inactive-opacity: .4;
     } */
   }
 
+  &-auto {
+    position: relative;
+    width: fit-content;
+    height: fit-content;
+  }
+
   &-media {
     visibility: hidden;
   }

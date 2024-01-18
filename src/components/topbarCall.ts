@@ -266,10 +266,8 @@ export default class TopbarCall {
           if(PopupElement.getPopups(PopupGroupCall).length) {
             return;
           }
-          
           PopupElement.createPopup(PopupGroupCall).show();
         }
-
       } else if(this.instance instanceof CallInstance) {
         const popups = PopupElement.getPopups(PopupCall);
         if(popups.find((popup) => popup.getCallInstance() === this.instance)) {

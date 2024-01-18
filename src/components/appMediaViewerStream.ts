@@ -4,12 +4,10 @@ import cancelEvent from '../helpers/dom/cancelEvent';
 import {attachClickEvent, hasMouseMovedSinceDown} from '../helpers/dom/clickEvent';
 import createVideo from '../helpers/dom/createVideo';
 import findUpClassName from '../helpers/dom/findUpClassName';
-import {isFullScreen} from '../helpers/dom/fullScreen';
 import replaceContent from '../helpers/dom/replaceContent';
 import EventListenerBase from '../helpers/eventListenerBase';
 import {MiddlewareHelper, getMiddleware} from '../helpers/middleware';
 import overlayCounter from '../helpers/overlayCounter';
-import windowSize from '../helpers/windowSize';
 import {AppManagers} from '../lib/appManagers/managers';
 import VideoPlayer from '../lib/mediaPlayer';
 import {NULL_PEER_ID} from '../lib/mtproto/mtproto_config';
@@ -19,8 +17,6 @@ import animationIntersector from './animationIntersector';
 import appNavigationController, {NavigationItem} from './appNavigationController';
 import {avatarNew} from './avatarNew';
 import ButtonIcon from './buttonIcon';
-import ProgressivePreloader from './preloader';
-import SwipeHandler from './swipeHandler';
 import wrapPeerTitle from './wrappers/peerTitle';
 
 export const STREAM_VIEWER_CLASSNAME = 'media-viewer';
@@ -33,18 +29,11 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 }> {
   protected wholeDiv: HTMLElement;
   protected overlaysDiv: HTMLElement;
-  protected moversContainer: HTMLElement;
   protected middlewareHelper: MiddlewareHelper;
   protected setMoverAnimationPromise: Promise<void>;
   protected closing: boolean;
-  protected swipeHandler: SwipeHandler;
   protected tempId = 0;
-  protected ctrlKeyDown: boolean;
-  protected preloaderStreamable: ProgressivePreloader = null;
   protected ignoreNextClick: boolean;
-  protected highlightSwitchersTimeout: number;
-  protected lastGestureTime: number;
-  protected isFirstOpen = true;
   protected navigationItem: NavigationItem;
 
   protected pageEl = document.getElementById('page-chats') as HTMLDivElement;
@@ -52,7 +41,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   protected managers: AppManagers;
   protected topbar: HTMLElement;
   protected buttons: {[k in buttonsType]: HTMLElement} = {} as any;
-  protected content: {[k in 'main' | 'container' | 'media' | 'mover']: HTMLElement} = {} as any;
+  protected content: {[k in 'main' | 'container' | 'media']: HTMLElement} = {} as any;
   protected author: {
     avatarEl: ReturnType<typeof avatarNew>,
     avatarMiddlewareHelper?: MiddlewareHelper,
@@ -65,12 +54,6 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     super(false);
     this.managers = rootScope.managers;
     this.middlewareHelper = getMiddleware();
-
-    this.preloaderStreamable = new ProgressivePreloader({
-      cancelable: false,
-      streamable: true
-    });
-    this.preloaderStreamable.construct();
 
     this.wholeDiv = document.createElement('div');
     this.wholeDiv.classList.add(STREAM_VIEWER_CLASSNAME + '-whole');
@@ -117,25 +100,23 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     this.content.main.classList.add(STREAM_VIEWER_CLASSNAME + '-content');
 
     this.content.container = document.createElement('div');
-    this.content.container.classList.add(STREAM_VIEWER_CLASSNAME + '-container');
-
-    this.content.media = document.createElement('div');
-    this.content.media.classList.add(STREAM_VIEWER_CLASSNAME + '-media');
-
-    this.content.container.append(this.content.media);
+    this.content.container.classList.add(STREAM_VIEWER_CLASSNAME + '-container', STREAM_VIEWER_CLASSNAME + '-auto');
 
     this.content.main.append(this.content.container);
     mainDiv.append(this.content.main);
+
+    this.content.main.middlewareHelper = this.middlewareHelper.get().create();
+    const video = createVideo({pip: true, middleware: this.content.main.middlewareHelper.get()});
+    video.src = 'stream/%7B%22dcId%22%3A2%2C%22location%22%3A%7B%22_%22%3A%22inputDocumentFileLocation%22%2C%22id%22%3A%225199710476254067157%22%2C%22access_hash%22%3A%22-1202662833049742147%22%2C%22file_reference%22%3A%5B4%2C124%2C101%2C233%2C203%2C0%2C0%2C0%2C23%2C101%2C167%2C128%2C107%2C166%2C204%2C145%2C34%2C102%2C3%2C26%2C12%2C123%2C208%2C169%2C68%2C156%2C1%2C40%2C41%5D%7D%2C%22size%22%3A4541349%2C%22mimeType%22%3A%22video%2Fmp4%22%2C%22fileName%22%3A%22IMG_9853.MOV%22%7D';
+
+    this.content.container.append(video);
     this.overlaysDiv.append(mainDiv);
     // * overlays end
 
     topbarLeft.append(this.buttons['mobile-close'], this.author.container);
     topbar.append(topbarLeft, buttonsDiv);
 
-    this.moversContainer = document.createElement('div');
-    this.moversContainer.classList.add(STREAM_VIEWER_CLASSNAME + '-movers');
-
-    this.wholeDiv.append(this.overlaysDiv, this.topbar, this.moversContainer);
+    this.wholeDiv.append(this.overlaysDiv, this.topbar);
   }
 
   protected setAuthorInfo(fromId: PeerId | string) {
@@ -170,7 +151,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       wrapTitlePromise
     ]).then(([_, title]) => {
       // TODO: i18n lacks 'streaming' word
-      replaceContent(this.author.date, 'streamn');
+      replaceContent(this.author.date, 'Streaming');
       replaceContent(this.author.nameEl, title);
 
       if(oldAvatar?.node && oldAvatar.node.parentElement) {
@@ -192,12 +173,6 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       const setAuthorPromise = this.setAuthorInfo(chatId);
       await setAuthorPromise;
 
-      const container = this.content.media;
-      if(container.firstElementChild) {
-        container.replaceChildren();
-      }
-
-      this.setNewMover();
       this.navigationItem = {
         type: 'media',
         onPop: (canAnimate) => {
@@ -215,7 +190,6 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       appNavigationController.pushItem(this.navigationItem);
 
       this.toggleOverlay(true);
-      this.setGlobalListeners();
 
       if(!this.wholeDiv.parentElement) {
         this.pageEl.insertBefore(this.wholeDiv, document.getElementById('main-columns'));
@@ -223,23 +197,8 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       }
 
       this.toggleWholeActive(true);
-
-      // if(isVideo)
-      const mover = this.content.mover;
-      mover.classList.add('temptemptemp');
-      const middleware = mover.middlewareHelper.get();
-      const video = createVideo({pip: true, middleware});
-      console.error('AAAA', mover);
-      video.src = 'stream/%7B%22dcId%22%3A2%2C%22location%22%3A%7B%22_%22%3A%22inputDocumentFileLocation%22%2C%22id%22%3A%225199710476254067157%22%2C%22access_hash%22%3A%22-1202662833049742147%22%2C%22file_reference%22%3A%5B4%2C124%2C101%2C233%2C203%2C0%2C0%2C0%2C23%2C101%2C167%2C128%2C107%2C166%2C204%2C145%2C34%2C102%2C3%2C26%2C12%2C123%2C208%2C169%2C68%2C156%2C1%2C40%2C41%5D%7D%2C%22size%22%3A4541349%2C%22mimeType%22%3A%22video%2Fmp4%22%2C%22fileName%22%3A%22IMG_9853.MOV%22%7D';
-
-      video.width = 1000;
-      video.height = 700;
-      mover.append(video);
-      // const
-      // TODO wtf
-      mover.style.display = '';
     } catch(e) {
-      console.error('AAAA ERORORORO', e)
+      console.error('XX ERORORORO', e)
     }
   }
 
@@ -254,32 +213,12 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     }
   }
 
-
-  protected setNewMover() {
-    const newMover = document.createElement('div');
-    newMover.classList.add('media-viewer-mover');
-    newMover.style.display = 'none';
-    newMover.middlewareHelper = this.middlewareHelper.get().create();
-
-    if(this.content.mover) {
-      const oldMover = this.content.mover;
-      oldMover.parentElement.append(newMover);
-    } else {
-      this.moversContainer.append(newMover);
-    }
-
-    return this.content.mover = newMover;
-  }
-
   public close(e?: MouseEvent) {
     if(e) {
       cancelEvent(e);
     }
 
-    if(this.setMoverAnimationPromise) return Promise.reject();
-
     this.closing = true;
-    this.swipeHandler?.removeListeners();
 
     if(this.navigationItem) {
       appNavigationController.removeItem(this.navigationItem);
@@ -292,8 +231,6 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       (window as any).appMediaViewer = undefined;
     }
 
-    this.removeGlobalListeners();
-
     this.wholeDiv.remove();
     this.toggleOverlay(false);
     this.middlewareHelper.destroy();
@@ -305,97 +242,12 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   }
 
   protected setListeners() {
-    [this.buttons.close, this.buttons['mobile-close'], this.preloaderStreamable.preloader].forEach((el) => {
+    [this.buttons.close, this.buttons['mobile-close']].forEach((el) => {
       attachClickEvent(el, this.close.bind(this));
     });
 
     this.wholeDiv.addEventListener('click', this.onClick);
-
-    this.swipeHandler = new SwipeHandler({
-      element: this.wholeDiv,
-      onSwipe: (xDiff, yDiff, e, cancelDrag) => {
-        if(isFullScreen()) {
-          return;
-        }
-
-        if(!IS_TOUCH_SUPPORTED) {
-          return;
-        }
-
-        const percentsY = Math.abs(yDiff) / windowSize.height;
-        if(percentsY > .2 || Math.abs(yDiff) > 125) {
-          this.close();
-          return true;
-        }
-
-        return false;
-      },
-      verifyTouchTarget: (e) => {
-        if(isFullScreen() ||
-          findUpClassName(e.target, 'ckin__controls') ||
-          findUpClassName(e.target, 'media-viewer-caption') ||
-          (findUpClassName(e.target, 'media-viewer-topbar') && e.type !== 'wheel')) {
-          return false;
-        }
-
-        return true;
-      },
-      cursor: ''
-    });
   }
-
-  protected toggleGlobalListeners(active: boolean) {
-    if(active) this.setGlobalListeners();
-    else this.removeGlobalListeners();
-  }
-
-  protected removeGlobalListeners() {
-    window.removeEventListener('keydown', this.onKeyDown);
-    window.removeEventListener('keyup', this.onKeyUp);
-  }
-
-  protected setGlobalListeners() {
-    window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
-  }
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    // this.log('onKeyDown', e);
-    if(overlayCounter.overlaysActive > 1) {
-      return;
-    }
-
-    const key = e.key;
-
-    let good = true;
-    if(key === 'ArrowRight') {
-    } else if(key === 'ArrowLeft') {
-    } else if(key === '-' || key === '=') {
-      if(this.ctrlKeyDown) {
-      }
-    } else {
-      good = false;
-    }
-
-    if(e.ctrlKey || e.metaKey) {
-      this.ctrlKeyDown = true;
-    }
-
-    if(good) {
-      cancelEvent(e);
-    }
-  };
-
-  private onKeyUp = (e: KeyboardEvent) => {
-    if(overlayCounter.overlaysActive > 1) {
-      return;
-    }
-
-    if(!(e.ctrlKey || e.metaKey)) {
-      this.ctrlKeyDown = false;
-    }
-  };
-
 
   // NOT SURE
   onClick = (e: MouseEvent) => {
@@ -404,26 +256,9 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       return;
     }
 
-    if(this.setMoverAnimationPromise) return;
-
     const target = e.target as HTMLElement;
     if(target.tagName === 'A') return;
     cancelEvent(e);
-
-    if(IS_TOUCH_SUPPORTED) {
-      if(this.highlightSwitchersTimeout) {
-        clearTimeout(this.highlightSwitchersTimeout);
-      } else {
-        this.wholeDiv.classList.add('highlight-switchers');
-      }
-
-      this.highlightSwitchersTimeout = window.setTimeout(() => {
-        this.wholeDiv.classList.remove('highlight-switchers');
-        this.highlightSwitchersTimeout = 0;
-      }, 3e3);
-
-      return;
-    }
 
     if(hasMouseMovedSinceDown(e)) {
       return;

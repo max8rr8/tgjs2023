@@ -120,7 +120,7 @@ let previousState: MovableState = {
 
 const className = 'group-call';
 
-export default class PopupGroupCall extends PopupElement {
+export default class  PopupGroupCall extends PopupElement {
   private instance: GroupCallInstance;
   private groupCallTitle: GroupCallTitleElement;
   private groupCallDescription: GroupCallDescriptionElement;
