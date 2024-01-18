@@ -1,5 +1,6 @@
 import {attachClickEvent} from '../../helpers/dom/clickEvent';
 import replaceContent from '../../helpers/dom/replaceContent';
+import {GroupCall} from '../../layer';
 import {AppManagers} from '../../lib/appManagers/managers';
 import I18n, {i18n} from '../../lib/langPack';
 import rootScope from '../../lib/rootScope';
@@ -15,15 +16,25 @@ export default class ChatJoinStream extends PinnedContainer {
   private gradient: HTMLDivElement;
   private contentSubtitle: I18n.IntlElement;
   private appMediaViewerStream: AppMediaViewerStream;
-  private currChatId: ChatId;
+  private chatId: ChatId | undefined;
+  private groupCallId: string | number | undefined
   private hasBtnCb: boolean;
 
   public setCurrChatId(chatId: ChatId) {
-    this.currChatId = chatId;
-    this.updateParticipantsCount(chatId);
+    this.chatId = chatId;
+    this.groupCallId = undefined;
+    if(this.chatId) {
+      this.managers.appProfileManager.getChatFull(chatId).then((chat) => {
+        if(chat.id != this.chatId) return;
+
+        this.groupCallId = chat.call?.id;
+        this.refreshParticipantsCount()
+      })
+    }
   }
 
   constructor(protected topbar: ChatTopbar, protected chat: Chat, protected managers: AppManagers) {
+    console.log('MAXRR chat join create', chat.peerId)
     super({
       topbar,
       chat,
@@ -39,6 +50,7 @@ export default class ChatJoinStream extends PinnedContainer {
       floating: true
     })
 
+
     this.appMediaViewerStream = new AppMediaViewerStream();
     this.contentSubtitle = new I18n.IntlElement({
       key: 'VoiceChat.Status.Connecting'
@@ -46,10 +58,12 @@ export default class ChatJoinStream extends PinnedContainer {
 
     // TODO:
     this.listenerSetter.add(rootScope)('group_call_update', (groupCall) => {
-      if(this.currChatId) {
-        this.updateParticipantsCount(this.currChatId);
-      }
+      this.updateParticipantsCount(groupCall);
     });
+
+    setInterval(() => {
+      this.refreshParticipantsCount()
+    }, 1e3)
 
 
     this.btnClose.remove();
@@ -65,17 +79,26 @@ export default class ChatJoinStream extends PinnedContainer {
     this.wrapper.prepend(this.gradient);
   }
 
-  public async updateParticipantsCount(chatId?: ChatId) {
+  public async refreshParticipantsCount() {
+    if(this.groupCallId) {
+      const call = await this.managers.appGroupCallsManager.getGroupCallFull(this.groupCallId)
+      this.updateParticipantsCount(call);
+    }
+  }
+
+  public updateParticipantsCount(groupCall: GroupCall) {
     // TODO: 'connecting' status?
+    const participantCount = groupCall._ == 'groupCall' ? groupCall.participants_count : 0;
+
     this.contentSubtitle.compareAndUpdate({
       key: 'VoiceChat.Status.Members',
-      args: [await this.managers.appGroupCallsManager.getParticipantsCount(chatId)]
+      args: [participantCount]
     });
     this.divAndCaption.fill({title: i18n('PeerInfo.Action.LiveStream'), subtitle: this.contentSubtitle.element});
   }
 
   // TODO: maybe there's better
-  public setBtnJoinCallback(cb: () => void) {
+  public attachJoinCallback(cb: () => void) {
     if(this.hasBtnCb) {
       return;
     }

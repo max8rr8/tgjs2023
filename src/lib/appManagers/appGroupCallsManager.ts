@@ -45,7 +45,6 @@ export class AppGroupCallsManager extends AppManager {
   private groupCalls: Map<GroupCallId, MyGroupCall>;
   private participants: Map<GroupCallId, Map<PeerId, GroupCallParticipant>>;
   private nextOffsets: Map<GroupCallId, string>;
-  private participantsCount: Map<ChatId, number>;
 
   // private doNotDispatchParticipantUpdate: PeerId;
 
@@ -55,7 +54,6 @@ export class AppGroupCallsManager extends AppManager {
     this.groupCalls = new Map();
     this.participants = new Map();
     this.nextOffsets = new Map();
-    this.participantsCount = new Map();
 
     this.apiUpdatesManager.addMultipleEventsListeners({
       updateGroupCall: (update) => {
@@ -77,10 +75,6 @@ export class AppGroupCallsManager extends AppManager {
         this.participants.delete(groupCall.id);
       }
     });
-  }
-
-  public getParticipantsCount(chatId: ChatId): number {
-    return this.participantsCount.get(chatId);
   }
 
   public getCachedParticipants(groupCallId: GroupCallId) {
@@ -239,19 +233,6 @@ export class AppGroupCallsManager extends AppManager {
       call = oldCall;
     } else {
       this.groupCalls.set(call.id, call);
-    }
-
-    if(chatId) {
-      if(oldCall?._ === 'groupCallDiscarded') {
-        this.participantsCount.delete(chatId);
-      }
-      if((call as GroupCall.groupCall).participants_count) {
-        this.participantsCount.set(chatId, (call as GroupCall.groupCall).participants_count);
-      } else {
-        this.getGroupCallParticipants(call.id).then((value) => {
-          this.participantsCount.set(chatId, value.participants.size);
-        })
-      }
     }
 
     if(shouldUpdate) {

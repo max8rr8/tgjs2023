@@ -218,6 +218,9 @@ export default class ChatTopbar {
     }
 
     if(this.joinStream) {
+      this.joinStream.attachJoinCallback(() => {
+        this.onJoinGroupCallClick();
+      })
       this.container.append(this.joinStream.divAndCaption.container);
     }
 
@@ -636,6 +639,8 @@ export default class ChatTopbar {
   }
 
   private onJoinGroupCallClick = () => {
+    this.joinStream.toggle(false)
+
     const tempText0 = document.createElement('p')
     tempText0.innerText = 'Start Streaming';
     const tempTitle0 = document.createElement('span');
@@ -869,13 +874,6 @@ export default class ChatTopbar {
       return false;
     }
 
-    console.error('AAAAA', this.managers.appGroupCallsManager);
-    // TODO: A HUGE HUGE PIECE OF- what to be replaced
-    setTimeout(() => {
-      this.joinStream.setCurrChatId(this.peerId.toChatId())
-    }, 200);
-    //
-
     const chat = apiManagerProxy.getChat(chatId);
     return (chat as MTChat.chat).pFlags?.call_active;
   }
@@ -1017,12 +1015,8 @@ export default class ChatTopbar {
 
       const isJoinStreamNeeded = this.isJoinStreamNeeded();
       this.joinStream.toggle(!isJoinStreamNeeded);
+      this.joinStream.setCurrChatId(isJoinStreamNeeded ? this.peerId.toChatId() : undefined)
       this.btnGroupCall.classList.toggle('not-needed', this.chat.isBroadcast);
-      if(isJoinStreamNeeded) {
-        this.joinStream.setBtnJoinCallback(() => {
-          this.onJoinGroupCallClick();
-        })
-      }
 
       // @ts-ignore
       rootScope.addEventListener('lalala', (call) => {
