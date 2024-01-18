@@ -647,29 +647,34 @@ export default class ChatTopbar {
     console.error('AAAAAA XXXXX')
     const chat = apiManagerProxy.getChat(this.peerId.toChatId()) as Channel;
 
-    if(chat._ === 'channel') {
-      if((chat.pFlags.creator)) {
-        this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtsmpInfo => {
-          PopupElement.createPopup(PopupStreamControl,  'stream-with', {
-            isStartStream: true,
-            peerId: this.peerId,
-            rtsmpInfo,
-            mainBtnCallback: () => {
-              this.managers.appGroupCallsManager.createGroupCall(this.peerId.toChatId(), {
-                rtmpStream: true
-              })
-              this.joinStream.openStreamWindow(this.peerId);
-            }
-          }).show();
-        }).catch(e => {
-          console.error('Cant open start with window, connecting to stream')
-          this.joinStream.openStreamWindow(this.peerId);
-        });
-      } else {
-        this.joinStream.openStreamWindow(this.peerId);
-      }
+    if(chat._ === 'channel' && chat.pFlags.creator && !this.joinStream.groupCallId) {
+      this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtsmpInfo => {
+        PopupElement.createPopup(PopupStreamControl,  'stream-with', {
+          isStartStream: true,
+          peerId: this.peerId,
+          rtsmpInfo,
+          mainBtnCallback: () => {
+            this.managers.appGroupCallsManager.createGroupCall(this.peerId.toChatId(), {
+              rtmpStream: true
+            })
+            this.joinStream.openStreamWindow(this.peerId);
+          }
+        }).show();
+      }).catch(e => {
+        console.error('Cant open start with window, connecting to stream')
+
+        if(this.joinStream.isRTMPStream) {
+          this.joinStream.openStreamWindow(this.peerId)
+        } else {
+          this.chat.appImManager.joinGroupCall(this.peerId);
+        }
+      });
     } else {
-      this.chat.appImManager.joinGroupCall(this.peerId);
+      if(this.joinStream.isRTMPStream) {
+        this.joinStream.openStreamWindow(this.peerId)
+      } else {
+        this.chat.appImManager.joinGroupCall(this.peerId);
+      }
     }
   }
 

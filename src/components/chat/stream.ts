@@ -18,8 +18,10 @@ export default class ChatJoinStream extends PinnedContainer {
   private contentSubtitle: I18n.IntlElement;
   private appMediaViewerStream: AppMediaViewerStream;
   private chatId: ChatId | undefined;
-  private groupCallId: string | number | undefined
   private hasBtnCb: boolean;
+
+  public groupCallId: string | number | undefined
+  public isRTMPStream: boolean;
 
   private shouldShow(): boolean {
     if(!IS_GROUP_CALL_SUPPORTED || this.chat.peerId.isUser() || this.chat.type !== ChatType.Chat || this.chat.threadId) return false;
@@ -31,6 +33,7 @@ export default class ChatJoinStream extends PinnedContainer {
   public setCurrChatId(chatId: ChatId) {
     this.chatId = chatId;
     this.groupCallId = undefined;
+    this.isRTMPStream = false
     this.toggle(true)
 
     if(!this.shouldShow()) return;
@@ -42,7 +45,7 @@ export default class ChatJoinStream extends PinnedContainer {
         if(chat.call) {
           this.groupCallId = chat.call?.id;
           this.toggle(false)
-          this.refreshParticipantsCount()
+          this.refreshCall()
         }
       })
     }
@@ -84,11 +87,11 @@ export default class ChatJoinStream extends PinnedContainer {
           }
         }
       }
-      this.updateParticipantsCount(groupCall);
+      this.updateCall(groupCall);
     });
 
     setInterval(() => {
-      this.refreshParticipantsCount()
+      this.refreshCall()
     }, 1e3)
 
 
@@ -105,15 +108,17 @@ export default class ChatJoinStream extends PinnedContainer {
     this.wrapper.prepend(this.gradient);
   }
 
-  public async refreshParticipantsCount() {
+  public async refreshCall() {
     if(this.groupCallId) {
       const call = await this.managers.appGroupCallsManager.getGroupCallFull(this.groupCallId)
-      this.updateParticipantsCount(call);
+      this.updateCall(call);
     }
   }
 
-  public updateParticipantsCount(groupCall: GroupCall) {
+  public updateCall(groupCall: GroupCall) {
     if(groupCall.id != this.groupCallId) return;
+
+    this.isRTMPStream = groupCall._ == 'groupCall' ? groupCall.pFlags.rtmp_stream : false;
 
     const participantCount = groupCall._ == 'groupCall' ? groupCall.participants_count : 0;
 
