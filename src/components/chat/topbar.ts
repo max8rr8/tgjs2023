@@ -645,35 +645,42 @@ export default class ChatTopbar {
     // if(!(chat as MTChat.chat)?.admin_rights.pFlags.manage_call) {
     //   return
     // }
-    if((apiManagerProxy.getChat(this.peerId.toChatId()) as Channel).pFlags.creator) {
-      this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then((v) => {
-        const tempText0 = document.createElement('p')
-        tempText0.innerText = 'Start Streaming';
-        const tempTitle0 = document.createElement('span');
-        tempTitle0.innerText = 'Stream With...'
+    console.error('AAAAAA XXXXX')
+    const chat = apiManagerProxy.getChat(this.peerId.toChatId()) as Channel;
 
-        PopupElement.createPopup(PopupStreamControl, 'stream-with', {
-          titleLangKey: 'DiscardVoiceMessageTitle',
-          mainButton: {
-          // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
-            text: tempText0, // TODO: add Start Streaming i18n and remove this
-            noRipple: true,
-            callback: () => {
-              console.error('AAAAAAAA FIX ME')
-              this.chat.appImManager.joinGroupCall(this.peerId);
-              this.joinStream.openStreamWindow(this.peerId);
-            }
-          },
-          closable: true,
-          title: tempTitle0, // TODO: use langPackKey, but first add it somewhere...
-          isStartStream: true,
-          peerId: this.peerId,
-          serverURL: (v as PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl).url,
-          streamKey: (v as PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl).key
-        }).show();
-      });
+    if(chat._ === 'channel') {
+      if((chat.pFlags.creator)) {
+        this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then((v) => {
+          const tempText0 = document.createElement('p')
+          tempText0.innerText = 'Start Streaming';
+          const tempTitle0 = document.createElement('span');
+          tempTitle0.innerText = 'Stream With...'
+          PopupElement.createPopup(PopupStreamControl, 'stream-with', {
+            titleLangKey: 'DiscardVoiceMessageTitle',
+            mainButton: {
+            // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
+              text: tempText0, // TODO: add Start Streaming i18n and remove this
+              noRipple: true,
+              callback: () => {
+                console.error('AAAAAAAA FIX ME')
+                this.chat.appImManager.joinGroupCall(this.peerId);
+                this.joinStream.openStreamWindow(this.peerId);
+              }
+            },
+            closable: true,
+            title: tempTitle0, // TODO: use langPackKey, but first add it somewhere...
+            isStartStream: true,
+            peerId: this.peerId,
+            serverURL: (v as PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl).url,
+            streamKey: (v as PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl).key
+          }).show();
+        });
+      } else {
+        this.chat.appImManager.joinGroupCall(this.peerId);
+        this.joinStream.openStreamWindow(this.peerId);
+      }
     } else {
-      this.joinStream.openStreamWindow(this.peerId);
+      this.chat.appImManager.joinGroupCall(this.peerId);
     }
   }
 
