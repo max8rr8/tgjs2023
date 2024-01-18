@@ -65,6 +65,7 @@ import handleVideoLeak from '../helpers/dom/handleVideoLeak';
 import Icon from './icon';
 import {replaceButtonIcon} from './button';
 import setCurrentTime from '../helpers/dom/setCurrentTime';
+import handleChromiumBug1250841 from '../helpers/dom/handleChromiumBug1250841';
 
 const ZOOM_STEP = 0.5;
 const ZOOM_INITIAL_VALUE = 1;
@@ -1673,6 +1674,7 @@ export default class AppMediaViewerBase<
       const video = /* useController ?
         appMediaPlaybackController.addMedia(message, false, true) as HTMLVideoElement :
          */createVideo({pip: useController, middleware});
+      handleChromiumBug1250841(video, media);
 
       if(this.wholeDiv.classList.contains('no-forwards')) {
         video.addEventListener('contextmenu', cancelEvent);

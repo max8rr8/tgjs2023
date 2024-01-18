@@ -12,6 +12,7 @@ import deferredPromise from '../../helpers/cancellablePromise';
 import cancelEvent from '../../helpers/dom/cancelEvent';
 import {attachClickEvent} from '../../helpers/dom/clickEvent';
 import createVideo from '../../helpers/dom/createVideo';
+import handleChromiumBug1250841 from '../../helpers/dom/handleChromiumBug1250841';
 import handleVideoLeak from '../../helpers/dom/handleVideoLeak';
 import isInDOM from '../../helpers/dom/isInDOM';
 import renderImageFromUrl from '../../helpers/dom/renderImageFromUrl';
@@ -188,6 +189,7 @@ export default async function wrapVideo({doc, altDoc, container, message, boxWid
   let preloader: ProgressivePreloader; // it must be here, otherwise will get error before initialization in round onPlay
 
   const video = createVideo({middleware});
+  handleChromiumBug1250841(video, doc);
   video.classList.add('media-video');
   video.muted = true;
   if(doc.type === 'round') {
