@@ -261,7 +261,7 @@ export default class TopbarCall {
     attachClickEvent(container, () => {
       if(this.instance instanceof GroupCallInstance) {
         if(this.instance.rtmpStream) {
-          new AppMediaViewerStream().openStream(this.instance.chatId);
+          new AppMediaViewerStream(this.instance).openStream();
         } else {
           if(PopupElement.getPopups(PopupGroupCall).length) {
             return;

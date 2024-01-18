@@ -9,6 +9,7 @@ import EventListenerBase from '../helpers/eventListenerBase';
 import {MiddlewareHelper, getMiddleware} from '../helpers/middleware';
 import overlayCounter from '../helpers/overlayCounter';
 import {AppManagers} from '../lib/appManagers/managers';
+import GroupCallInstance from '../lib/calls/groupCallInstance';
 import VideoPlayer from '../lib/mediaPlayer';
 import {NULL_PEER_ID} from '../lib/mtproto/mtproto_config';
 import wrapEmojiText from '../lib/richTextProcessor/wrapEmojiText';
@@ -50,7 +51,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     date: HTMLElement
   } = {} as any;
 
-  constructor() {
+  constructor(protected groupCall: GroupCallInstance) {
     super(false);
     this.managers = rootScope.managers;
     this.middlewareHelper = getMiddleware();
@@ -167,10 +168,10 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     });
   }
 
-  public async openStream(chatId: ChatId) {
+  public async openStream() {
     try {
       this.setListeners();
-      const setAuthorPromise = this.setAuthorInfo(chatId);
+      const setAuthorPromise = this.setAuthorInfo(this.groupCall.chatId);
       await setAuthorPromise;
 
       this.navigationItem = {

@@ -175,6 +175,8 @@ export default class GroupCallConnectionInstance extends CallConnectionInstanceB
   }
 
   protected async negotiateInternal() {
+    if(this.groupCall.rtmpStream) return;
+
     const {connection, description} = this;
     const isNewConnection = connection.iceConnectionState === 'new' && !description.getEntryByMid('0').source;
     const log = this.log.bindPrefix('startNegotiation');
