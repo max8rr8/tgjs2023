@@ -159,7 +159,7 @@ export type BroadcastEvents = {
 
   'choosing_sticker': boolean
 
-  'group_call_update': GroupCall,
+  'group_call_update': GroupCall & { chat_id?: ChatId },
   'group_call_participant': {groupCallId: GroupCallId, participant: GroupCallParticipant},
   // 'group_call_video_track_added': {instance: GroupCallInstance}
 

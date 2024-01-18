@@ -1,3 +1,4 @@
+import IS_GROUP_CALL_SUPPORTED from '../../environment/groupCallSupport';
 import {attachClickEvent} from '../../helpers/dom/clickEvent';
 import replaceContent from '../../helpers/dom/replaceContent';
 import {GroupCall} from '../../layer';
@@ -6,7 +7,7 @@ import I18n, {i18n} from '../../lib/langPack';
 import rootScope from '../../lib/rootScope';
 import AppMediaViewerStream from '../appMediaViewerStream';
 import DivAndCaption from '../divAndCaption';
-import Chat from './chat';
+import Chat, {ChatType} from './chat';
 import PinnedContainer from './pinnedContainer';
 import ChatTopbar from './topbar';
 
@@ -20,15 +21,29 @@ export default class ChatJoinStream extends PinnedContainer {
   private groupCallId: string | number | undefined
   private hasBtnCb: boolean;
 
+  private shouldShow(): boolean {
+    if(!IS_GROUP_CALL_SUPPORTED || this.chat.peerId.isUser() || this.chat.type !== ChatType.Chat || this.chat.threadId) return false;
+    if(this.chat.isAnyGroup || !this.chat.isBroadcast) return false;
+
+    return true;
+  }
+
   public setCurrChatId(chatId: ChatId) {
     this.chatId = chatId;
     this.groupCallId = undefined;
+    this.toggle(true)
+
+    if(!this.shouldShow()) return;
+
+
     if(this.chatId) {
       this.managers.appProfileManager.getChatFull(chatId).then((chat) => {
         if(chat.id != this.chatId) return;
-
-        this.groupCallId = chat.call?.id;
-        this.refreshParticipantsCount()
+        if(chat.call) {
+          this.groupCallId = chat.call?.id;
+          this.toggle(false)
+          this.refreshParticipantsCount()
+        }
       })
     }
   }
@@ -58,6 +73,17 @@ export default class ChatJoinStream extends PinnedContainer {
 
     // TODO:
     this.listenerSetter.add(rootScope)('group_call_update', (groupCall) => {
+      if(groupCall.chat_id == this.chatId) {
+        if(groupCall._ == 'groupCallDiscarded') {
+          this.groupCallId = undefined;
+          this.toggle(true)
+        } else {
+          if(this.shouldShow()) {
+            this.groupCallId = groupCall.id;
+            this.toggle(false);
+          }
+        }
+      }
       this.updateParticipantsCount(groupCall);
     });
 
@@ -87,7 +113,8 @@ export default class ChatJoinStream extends PinnedContainer {
   }
 
   public updateParticipantsCount(groupCall: GroupCall) {
-    // TODO: 'connecting' status?
+    if(groupCall.id != this.groupCallId) return;
+
     const participantCount = groupCall._ == 'groupCall' ? groupCall.participants_count : 0;
 
     this.contentSubtitle.compareAndUpdate({

@@ -19,7 +19,7 @@ import {AppManager} from './manager';
 import getPeerId from './utils/peers/getPeerId';
 
 export type GroupCallId = GroupCall['id'];
-export type MyGroupCall = GroupCall | InputGroupCall;
+export type MyGroupCall = (GroupCall | InputGroupCall) & { chat_id?: ChatId };
 
 export type GroupCallConnectionType = 'main' | 'presentation';
 
@@ -223,6 +223,8 @@ export class AppGroupCallsManager extends AppManager {
   }
 
   public saveGroupCall(call: MyGroupCall, chatId?: ChatId) {
+    call.chat_id = chatId;
+
     const oldCall = this.groupCalls.get(call.id);
     const shouldUpdate = call._ !== 'inputGroupCall' && (!oldCall || oldCall._ !== 'groupCallDiscarded');
     if(oldCall) {

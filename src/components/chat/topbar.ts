@@ -881,24 +881,6 @@ export default class ChatTopbar {
     }
   }
 
-  private isJoinStreamNeeded(): boolean {
-    if(!IS_GROUP_CALL_SUPPORTED || this.peerId.isUser() || this.chat.type !== ChatType.Chat || this.chat.threadId) return false;
-
-    const currentGroupCall = groupCallsController.groupCall;
-    const chatId = this.peerId.toChatId();
-    if(currentGroupCall?.chatId === chatId) {
-      return false;
-    }
-
-    if(this.chat.isAnyGroup || !this.chat.isBroadcast) {
-      return false;
-    }
-
-    const chat = apiManagerProxy.getChat(chatId);
-    console.error('AAAAAAA', chat)
-    return (chat as MTChat.chat).pFlags?.call_active;
-  }
-
   private appendPinnedMessage(pinnedMessage: ChatPinnedMessage) {
     const container = pinnedMessage.pinnedMessageContainer.divAndCaption.container;
     if(this.pinnedMessage && this.pinnedMessage !== pinnedMessage) {
@@ -1034,9 +1016,7 @@ export default class ChatTopbar {
         this.pinnedMessage = undefined;
       }
 
-      const isJoinStreamNeeded = this.isJoinStreamNeeded();
-      this.joinStream.toggle(!isJoinStreamNeeded);
-      this.joinStream.setCurrChatId(isJoinStreamNeeded ? this.peerId.toChatId() : undefined)
+      this.joinStream.setCurrChatId(this.peerId.toChatId())
       this.btnGroupCall.classList.toggle('not-needed', this.chat.isBroadcast);
 
       // @ts-ignore
