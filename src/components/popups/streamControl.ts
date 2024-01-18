@@ -3,22 +3,19 @@ import {copyTextToClipboard} from '../../helpers/clipboard';
 import cancelEvent from '../../helpers/dom/cancelEvent';
 import {attachClickEvent} from '../../helpers/dom/clickEvent';
 import Icons from '../../icons';
+import {PhoneGroupCallStreamRtmpUrl} from '../../layer';
 import I18n, {LangPackKey, i18n} from '../../lib/langPack';
 import ButtonIcon from '../buttonIcon';
 import ButtonMenuToggle from '../buttonMenuToggle';
 import Icon from '../icon';
 import {toast} from '../toast';
 
-export type PopupStreamOptions = PopupOptions & Partial<{
+export type PopupStreamOptions = {
   peerId: PeerId,
-  titleLangKey: LangPackKey,
-  titleLangArgs: any[],
-  bodyButtons: Array<PopupButton>,
-  mainButton: PopupButton,
   isStartStream: boolean,
-  serverURL: string,
-  streamKey: string
-}>;
+  rtsmpInfo: PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl,
+  mainBtnCallback: () => void
+};
 
 export default class PopupStreamControl extends PopupElement {
   private btnMain: HTMLButtonElement;
@@ -31,36 +28,30 @@ export default class PopupStreamControl extends PopupElement {
   private serverURL: string;
   private streamKey: string;
 
-  // // TODO
-  // get serverURL(): string {
-  //   const url = 'rtmps://dc4-1.rtmp.t.me/s/';
-  //   return url;
-  // }
-
-  // // TODO
-  // get streamKey(): string {
-  //   const key = 'some-stream-key';
-  //   return key;
-  // }
-
   // TODO: desctuctor !!!!!!!!!!!!
-
   constructor(private className: string, options: PopupStreamOptions) {
+    const buttonText = document.createElement('p')
+    buttonText.innerText = 'Start Streaming';
+
+    const titleText = document.createElement('span');
+    titleText.innerText = 'Stream With...'
+
     super('popup-stream' + (className ? ' ' + className : ''), {
+      title: titleText,
       overlayClosable: true,
-      ...options,
-      buttons: [options.mainButton],
+      closable: true,
+      buttons: [{
+        text: buttonText,
+        callback: () => {
+          options.mainBtnCallback()
+          this.destroy()
+        }
+      }],
       body: true
     });
-    try {
-      console.error('AAAA ==== =', this.managers.appGroupCallsManager.getURLAndKey, options.peerId)
-    } catch(e) {
-      console.error('AAAA ERROR ', e)
-    }
 
-    this.serverURL = options.serverURL;
-    this.streamKey = options.streamKey;
-
+    this.serverURL = options.rtsmpInfo.url;
+    this.streamKey = options.rtsmpInfo.key;
 
     //* TODO: more button
     this.btnMore = ButtonMenuToggle({

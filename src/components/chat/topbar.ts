@@ -60,7 +60,6 @@ import PopupBoostsViaGifts from '../popups/boostsViaGifts';
 import AppStatisticsTab from '../sidebarRight/tabs/statistics';
 import {ChatType} from './chat';
 import PopupStreamControl from '../popups/streamControl';
-import {AppGroupCallsManager} from '../../lib/appManagers/appGroupCallsManager';
 
 type ButtonToVerify = {element?: HTMLElement, verify: () => boolean | Promise<boolean>};
 
@@ -650,33 +649,23 @@ export default class ChatTopbar {
 
     if(chat._ === 'channel') {
       if((chat.pFlags.creator)) {
-        this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then((v) => {
-          const tempText0 = document.createElement('p')
-          tempText0.innerText = 'Start Streaming';
-          const tempTitle0 = document.createElement('span');
-          tempTitle0.innerText = 'Stream With...'
-          PopupElement.createPopup(PopupStreamControl, 'stream-with', {
-            titleLangKey: 'DiscardVoiceMessageTitle',
-            mainButton: {
-            // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
-              text: tempText0, // TODO: add Start Streaming i18n and remove this
-              noRipple: true,
-              callback: () => {
-                console.error('AAAAAAAA FIX ME')
-                this.chat.appImManager.joinGroupCall(this.peerId);
-                this.joinStream.openStreamWindow(this.peerId);
-              }
-            },
-            closable: true,
-            title: tempTitle0, // TODO: use langPackKey, but first add it somewhere...
+        this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtsmpInfo => {
+          PopupElement.createPopup(PopupStreamControl,  'stream-with', {
             isStartStream: true,
             peerId: this.peerId,
-            serverURL: (v as PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl).url,
-            streamKey: (v as PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl).key
+            rtsmpInfo,
+            mainBtnCallback: () => {
+              this.managers.appGroupCallsManager.createGroupCall(this.peerId.toChatId(), {
+                rtmpStream: true
+              })
+              this.joinStream.openStreamWindow(this.peerId);
+            }
           }).show();
+        }).catch(e => {
+          console.error('Cant open start with window, connecting to stream')
+          this.joinStream.openStreamWindow(this.peerId);
         });
       } else {
-        this.chat.appImManager.joinGroupCall(this.peerId);
         this.joinStream.openStreamWindow(this.peerId);
       }
     } else {

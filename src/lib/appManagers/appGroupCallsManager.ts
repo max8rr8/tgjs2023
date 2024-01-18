@@ -244,12 +244,17 @@ export class AppGroupCallsManager extends AppManager {
     return call;
   }
 
-  public async createGroupCall(chatId: ChatId, scheduleDate?: number, title?: string) {
+  public async createGroupCall(chatId: ChatId, options: Partial<{
+    scheduleDate: number,
+    title: string,
+    rtmpStream: boolean
+  }> = {}) {
     const updates = await this.apiManager.invokeApi('phone.createGroupCall', {
       peer: this.appPeersManager.getInputPeerById(chatId.toPeerId(true)),
       random_id: nextRandomUint(32),
-      schedule_date: scheduleDate,
-      title
+      schedule_date: options.scheduleDate,
+      title: options.title,
+      rtmp_stream: options.rtmpStream
     });
 
     this.apiUpdatesManager.processUpdateMessage(updates);
@@ -346,15 +351,10 @@ export class AppGroupCallsManager extends AppManager {
   }
 
   public async getURLAndKey(peerId: PeerId, revoke: boolean) {
-    const promise = this.apiManager.invokeApi('phone.getGroupCallStreamRtmpUrl', {
+    return this.apiManager.invokeApi('phone.getGroupCallStreamRtmpUrl', {
       peer: this.appPeersManager.getInputPeerById(peerId),
       revoke
     })
-    .then((rtmpURL) => {
-      return rtmpURL
-    }).catch((error) => {
-    })
-    return promise;
   }
 
   public async joinGroupCall(groupCallId: GroupCallId, params: DataJSON, options: GroupCallConnectionInstance['options']) {
