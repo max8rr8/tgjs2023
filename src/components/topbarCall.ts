@@ -29,6 +29,7 @@ import {AppManagers} from '../lib/appManagers/managers';
 import groupCallsController from '../lib/calls/groupCallsController';
 import StreamManager from '../lib/calls/streamManager';
 import callsController from '../lib/calls/callsController';
+import AppMediaViewerStream from './appMediaViewerStream';
 
 function convertCallStateToGroupState(state: CALL_STATE, isMuted: boolean) {
   switch(state) {
@@ -259,11 +260,16 @@ export default class TopbarCall {
 
     attachClickEvent(container, () => {
       if(this.instance instanceof GroupCallInstance) {
-        if(PopupElement.getPopups(PopupGroupCall).length) {
-          return;
+        if(this.instance.rtmpStream) {
+          new AppMediaViewerStream().openStream(this.instance.chatId);
+        } else {
+          if(PopupElement.getPopups(PopupGroupCall).length) {
+            return;
+          }
+          
+          PopupElement.createPopup(PopupGroupCall).show();
         }
 
-        PopupElement.createPopup(PopupGroupCall).show();
       } else if(this.instance instanceof CallInstance) {
         const popups = PopupElement.getPopups(PopupCall);
         if(popups.find((popup) => popup.getCallInstance() === this.instance)) {

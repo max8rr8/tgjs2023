@@ -186,14 +186,10 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     });
   }
 
-  public async openMedia({
-    fromId
-  } : {
-    fromId: PeerId
-  }) {
+  public async openStream(chatId: ChatId) {
     try {
       this.setListeners();
-      const setAuthorPromise = this.setAuthorInfo(fromId);
+      const setAuthorPromise = this.setAuthorInfo(chatId);
       await setAuthorPromise;
 
       const container = this.content.media;

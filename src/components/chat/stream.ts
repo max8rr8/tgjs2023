@@ -5,7 +5,6 @@ import {GroupCall} from '../../layer';
 import {AppManagers} from '../../lib/appManagers/managers';
 import I18n, {i18n} from '../../lib/langPack';
 import rootScope from '../../lib/rootScope';
-import AppMediaViewerStream from '../appMediaViewerStream';
 import DivAndCaption from '../divAndCaption';
 import Chat, {ChatType} from './chat';
 import PinnedContainer from './pinnedContainer';
@@ -16,7 +15,6 @@ export default class ChatJoinStream extends PinnedContainer {
   public btnJoin: HTMLButtonElement;
   private gradient: HTMLDivElement;
   private contentSubtitle: I18n.IntlElement;
-  private appMediaViewerStream: AppMediaViewerStream;
   private chatId: ChatId | undefined;
   private hasBtnCb: boolean;
 
@@ -69,7 +67,6 @@ export default class ChatJoinStream extends PinnedContainer {
     })
 
 
-    this.appMediaViewerStream = new AppMediaViewerStream();
     this.contentSubtitle = new I18n.IntlElement({
       key: 'VoiceChat.Status.Connecting'
     });
@@ -136,13 +133,5 @@ export default class ChatJoinStream extends PinnedContainer {
     }
     attachClickEvent(this.btnJoin, cb);
     this.hasBtnCb = true;
-  }
-
-  public openStreamWindow(peerId: PeerId) {
-    try {
-      this.appMediaViewerStream.openMedia({fromId: peerId});
-    } catch(e) {
-      console.error(e)
-    }
   }
 }

@@ -29,7 +29,7 @@ import cancelEvent from '../../helpers/dom/cancelEvent';
 import {attachClickEvent} from '../../helpers/dom/clickEvent';
 import {toast, toastNew} from '../toast';
 import replaceContent from '../../helpers/dom/replaceContent';
-import {ChatFull, Chat as MTChat, GroupCall, Dialog, PhoneGroupCallStreamRtmpUrl} from '../../layer';
+import {ChatFull, Chat as MTChat, Dialog} from '../../layer';
 import PopupPickUser from '../popups/pickUser';
 import PopupPeer, {PopupPeerCheckboxOptions} from '../popups/peer';
 import AppEditContactTab from '../sidebarRight/tabs/editContact';
@@ -647,7 +647,7 @@ export default class ChatTopbar {
     console.error('AAAAAA XXXXX')
     const chat = apiManagerProxy.getChat(this.peerId.toChatId()) as Channel;
 
-    if(chat._ === 'channel' && chat.pFlags.creator && !this.joinStream.groupCallId) {
+    if(chat._ === 'channel' && this.chat.isBroadcast && chat.pFlags.creator && !this.joinStream.groupCallId) {
       this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtsmpInfo => {
         PopupElement.createPopup(PopupStreamControl,  'stream-with', {
           isStartStream: true,
@@ -657,24 +657,15 @@ export default class ChatTopbar {
             this.managers.appGroupCallsManager.createGroupCall(this.peerId.toChatId(), {
               rtmpStream: true
             })
-            this.joinStream.openStreamWindow(this.peerId);
+            this.chat.appImManager.joinGroupCall(this.peerId);
           }
         }).show();
       }).catch(e => {
         console.error('Cant open start with window, connecting to stream')
-
-        if(this.joinStream.isRTMPStream) {
-          this.joinStream.openStreamWindow(this.peerId)
-        } else {
-          this.chat.appImManager.joinGroupCall(this.peerId);
-        }
+        this.chat.appImManager.joinGroupCall(this.peerId);
       });
     } else {
-      if(this.joinStream.isRTMPStream) {
-        this.joinStream.openStreamWindow(this.peerId)
-      } else {
-        this.chat.appImManager.joinGroupCall(this.peerId);
-      }
+      this.chat.appImManager.joinGroupCall(this.peerId);
     }
   }
 

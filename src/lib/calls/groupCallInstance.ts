@@ -32,6 +32,7 @@ import {generateSelfVideo, makeSsrcFromParticipant, makeSsrcsFromParticipant} fr
 export default class GroupCallInstance extends CallInstanceBase<{
   state: (state: GROUP_CALL_STATE) => void,
   pinned: (source?: GroupCallOutputSource) => void,
+  rtmpConnected: () => void,
 }> {
   public id: GroupCallId;
   public chatId: ChatId;
@@ -44,6 +45,8 @@ export default class GroupCallInstance extends CallInstanceBase<{
 
   // will be set with negotiation
   public joined: boolean;
+
+  public rtmpStream: boolean;
 
   private pinnedSources: Array<GroupCallOutputSource>;
   private participantsSsrcs: Map<PeerId, Ssrc[]>;
@@ -77,6 +80,7 @@ export default class GroupCallInstance extends CallInstanceBase<{
       this.isSpeakingMap = new Map();
     }
 
+    this.rtmpStream = false;
     this.pinnedSources = [];
     this.participantsSsrcs = new Map();
     this.hadAutoPinnedSources = new Set();
@@ -96,7 +100,11 @@ export default class GroupCallInstance extends CallInstanceBase<{
   }
 
   get state() {
-    const {connectionState} = this;
+    const {connectionState, rtmpStream} = this;
+    if(rtmpStream) {
+      return GROUP_CALL_STATE.MUTED_BY_ADMIN;
+    }
+
     if(connectionState === 'closed') {
       return GROUP_CALL_STATE.CLOSED;
     } else if(connectionState !== 'connected' && (!IS_SAFARI || connectionState !== 'completed')) {
@@ -327,6 +335,8 @@ export default class GroupCallInstance extends CallInstanceBase<{
   }
 
   public async hangUp(discard = false, rejoin = false, isDiscarded = false) {
+    this.rtmpStream = false;
+
     for(const type in this.connections) {
       const connection = this.connections[type as GroupCallConnectionType];
       connection.closeConnectionAndStream(!rejoin);

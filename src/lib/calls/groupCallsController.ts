@@ -234,6 +234,15 @@ export class GroupCallsController extends EventListenerBase<{
         }
       });
 
+      currentGroupCall.addEventListener('rtmpConnected', () => {
+        currentGroupCall.dispatchEvent('state', currentGroupCall.state);
+        if(!currentGroupCall.joined) {
+          currentGroupCall.joined = true;
+          this.audioAsset.playSound('group_call_start.mp3');
+          this.managers.appGroupCallsManager.getGroupCallParticipants(groupCallId);
+        }
+      })
+
       connectionInstance.createDescription();
       connectionInstance.createDataChannel();
 
