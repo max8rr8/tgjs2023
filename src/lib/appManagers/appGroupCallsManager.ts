@@ -395,4 +395,12 @@ export class AppGroupCallsManager extends AppManager {
       this.apiUpdatesManager.processUpdateMessage(updates);
     });
   }
+
+  public getStreamChannels(call: InputGroupCall) {
+    return this.apiManager.invokeApi('phone.getGroupCallStreamChannels', {
+      call
+    }).then(e => {
+      return e.channels
+    })
+  }
 }

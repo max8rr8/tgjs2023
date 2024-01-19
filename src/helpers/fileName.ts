@@ -57,6 +57,11 @@ export function getFileNameByLocation(location: InputFileLocation | InputWebFile
       break;
     }
 
+    case 'inputGroupCallStream': {
+      str = ['groupCallStream', location.call.id, location.time_ms, location.time_ms, location.video_channel ?? 'nope'].join(FILENAME_JOINER);
+      break
+    }
+
     default: {
       console.error('Unrecognized location:', location);
       str = '';
