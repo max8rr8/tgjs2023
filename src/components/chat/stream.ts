@@ -121,7 +121,7 @@ export default class ChatJoinStream extends PinnedContainer {
 
     this.contentSubtitle.compareAndUpdate({
       key: 'VoiceChat.Status.Members',
-      args: [participantCount]
+      args: [participantCount < 0 ? 0 : participantCount]
     });
     this.divAndCaption.fill({title: i18n('PeerInfo.Action.LiveStream'), subtitle: this.contentSubtitle.element});
   }
