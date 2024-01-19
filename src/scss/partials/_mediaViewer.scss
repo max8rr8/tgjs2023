@@ -113,6 +113,20 @@ $inactive-opacity: .4;
     position: relative;
     width: fit-content;
     height: fit-content;
+    margin-top: 2.5rem;
+    max-width: 90%;
+    max-height: 80%;
+    display: inline-block;
+    flex: none;
+    border-radius: 10px;
+
+    video {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      width: auto;
+      max-height: 100%;
+    }
   }
 
   &-media {

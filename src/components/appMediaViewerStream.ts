@@ -108,7 +108,9 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     this.content.main.middlewareHelper = this.middlewareHelper.get().create();
     const video = createVideo({pip: true, middleware: this.content.main.middlewareHelper.get()});
     video.src = 'stream/%7B%22dcId%22%3A2%2C%22location%22%3A%7B%22_%22%3A%22inputDocumentFileLocation%22%2C%22id%22%3A%225199710476254067157%22%2C%22access_hash%22%3A%22-1202662833049742147%22%2C%22file_reference%22%3A%5B4%2C124%2C101%2C233%2C203%2C0%2C0%2C0%2C23%2C101%2C167%2C128%2C107%2C166%2C204%2C145%2C34%2C102%2C3%2C26%2C12%2C123%2C208%2C169%2C68%2C156%2C1%2C40%2C41%5D%7D%2C%22size%22%3A4541349%2C%22mimeType%22%3A%22video%2Fmp4%22%2C%22fileName%22%3A%22IMG_9853.MOV%22%7D';
+    // video.src = 'stream/%7B%22dcId%22%3A2%2C%22location%22%3A%7B%22_%22%3A%22inputDocumentFileLocation%22%2C%22id%22%3A%225283272299108120583%22%2C%22access_hash%22%3A%22-6833039415976833006%22%2C%22file_reference%22%3A%5B1%2C0%2C9%2C75%2C76%2C101%2C170%2C43%2C109%2C218%2C9%2C168%2C125%2C111%2C201%2C22%2C67%2C235%2C76%2C2%2C25%2C252%2C215%2C80%2C92%5D%7D%2C%22size%22%3A337461%2C%22mimeType%22%3A%22video%2Fmp4%22%7D'
 
+    const videoWrap = document.createElement('div');
     this.content.container.append(video);
     this.overlaysDiv.append(mainDiv);
     // * overlays end
