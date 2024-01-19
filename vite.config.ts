@@ -23,6 +23,7 @@ const handlebarsPlugin = handlebars({
 
 const serverOptions: ServerOptions = {
   // host: '192.168.92.78',
+  hmr: false,
   port: 8080
 };
 

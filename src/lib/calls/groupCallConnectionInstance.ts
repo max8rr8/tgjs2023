@@ -161,12 +161,6 @@ export default class GroupCallConnectionInstance extends CallConnectionInstanceB
 
     const data: UpdateGroupCallConnectionData = JSON.parse(update.params.data);
 
-    if(data.rtmp) {
-      this.groupCall.rtmpStream = true
-      this.groupCall.dispatchEvent('rtmpConnected')
-      return data;
-    }
-
     data.audio = data.audio || groupCall.connections.main.description.audio;
     description.setData(data);
     filterServerCodecs(mainChannels, data);
@@ -175,8 +169,6 @@ export default class GroupCallConnectionInstance extends CallConnectionInstanceB
   }
 
   protected async negotiateInternal() {
-    if(this.groupCall.rtmpStream) return;
-
     const {connection, description} = this;
     const isNewConnection = connection.iceConnectionState === 'new' && !description.getEntryByMid('0').source;
     const log = this.log.bindPrefix('startNegotiation');
@@ -203,12 +195,12 @@ export default class GroupCallConnectionInstance extends CallConnectionInstanceB
 
     if(isNewConnection) {
       try {
-        const {rtmp} = await this.invokeJoinGroupCall(localSdp, mainChannels, this.options);
-        if(rtmp) return;
+        await this.invokeJoinGroupCall(localSdp, mainChannels, this.options);
       } catch(e) {
         this.log.error('[tdweb] joinGroupCall error', e);
       }
     }
+
     /* if(!data) {
       log('abort 0');
       this.closeConnectionAndStream(connection, streamManager);

@@ -74,8 +74,7 @@ export type UpdateGroupCallConnectionData = {
   transport: GroupCallConnectionTransport,
   audio?: AudioCodec,
   video: VideoCodec,
-  screencast?: VideoCodec,
-  rtmp?: boolean
+  screencast?: VideoCodec
 };
 
 export type UpgradeGroupCallConnectionPresentationData = Omit<UpdateGroupCallConnectionData, 'audio'>;

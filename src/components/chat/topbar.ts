@@ -60,6 +60,7 @@ import PopupBoostsViaGifts from '../popups/boostsViaGifts';
 import AppStatisticsTab from '../sidebarRight/tabs/statistics';
 import {ChatType} from './chat';
 import PopupStreamControl from '../popups/streamControl';
+import AppMediaViewerStream from '../appMediaViewerStream';
 
 type ButtonToVerify = {element?: HTMLElement, verify: () => boolean | Promise<boolean>};
 
@@ -637,27 +638,24 @@ export default class ChatTopbar {
     this.chat.appImManager.callUser(this.peerId.toUserId(), type);
   }
 
-  private onJoinGroupCallClick = () => {
-    // TODO, not sure now
-    // const chat = apiManagerProxy.getChat(this.peerId.toChatId());
-    // console.error('AAAa ========', (chat as MTChat.chat)?.admin_rights.pFlags.manage_call)
-    // if(!(chat as MTChat.chat)?.admin_rights.pFlags.manage_call) {
-    //   return
-    // }
-    console.error('AAAAAA XXXXX')
-    const chat = apiManagerProxy.getChat(this.peerId.toChatId()) as Channel;
+  private async onJoinGroupCallClick() {
+    const chatFull = await this.managers.appProfileManager.getChatFull(this.peerId.toChatId());
 
-    if(chat._ === 'channel' && this.chat.isBroadcast && chat.pFlags.creator && !this.joinStream.groupCallId) {
+    if(chatFull._ === 'channelFull' && this.chat.isBroadcast && !chatFull?.call?.id) {
       this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtsmpInfo => {
         PopupElement.createPopup(PopupStreamControl,  'stream-with', {
           isStartStream: true,
           peerId: this.peerId,
           rtsmpInfo,
-          mainBtnCallback: () => {
-            this.managers.appGroupCallsManager.createGroupCall(this.peerId.toChatId(), {
+          mainBtnCallback: async() => {
+            const groupCall = await this.managers.appGroupCallsManager.createGroupCall(this.peerId.toChatId(), {
               rtmpStream: true
             })
-            this.chat.appImManager.joinGroupCall(this.peerId);
+            new AppMediaViewerStream(this.peerId, {
+              _: 'inputGroupCall',
+              id: groupCall.id,
+              access_hash: groupCall.access_hash
+            }).openStream();
           }
         }).show();
       }).catch(e => {
@@ -665,7 +663,11 @@ export default class ChatTopbar {
         this.chat.appImManager.joinGroupCall(this.peerId);
       });
     } else {
-      this.chat.appImManager.joinGroupCall(this.peerId);
+      if(this.joinStream.isRTMPStream) {
+        new AppMediaViewerStream(this.peerId, chatFull.call).openStream();
+      } else {
+        this.chat.appImManager.joinGroupCall(this.peerId);
+      }
     }
   }
 

@@ -1,4 +1,3 @@
-import IS_TOUCH_SUPPORTED from '../environment/touchSupport';
 import {IS_MOBILE_SAFARI} from '../environment/userAgent';
 import cancelEvent from '../helpers/dom/cancelEvent';
 import {attachClickEvent, hasMouseMovedSinceDown} from '../helpers/dom/clickEvent';
@@ -8,8 +7,8 @@ import replaceContent from '../helpers/dom/replaceContent';
 import EventListenerBase from '../helpers/eventListenerBase';
 import {MiddlewareHelper, getMiddleware} from '../helpers/middleware';
 import overlayCounter from '../helpers/overlayCounter';
+import {InputGroupCall} from '../layer';
 import {AppManagers} from '../lib/appManagers/managers';
-import GroupCallInstance from '../lib/calls/groupCallInstance';
 import VideoPlayer from '../lib/mediaPlayer';
 import {NULL_PEER_ID} from '../lib/mtproto/mtproto_config';
 import wrapEmojiText from '../lib/richTextProcessor/wrapEmojiText';
@@ -51,7 +50,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     date: HTMLElement
   } = {} as any;
 
-  constructor(protected groupCall: GroupCallInstance) {
+  constructor(protected peerId: PeerId, protected groupCall: InputGroupCall) {
     super(false);
     this.managers = rootScope.managers;
     this.middlewareHelper = getMiddleware();
@@ -120,6 +119,31 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     this.wholeDiv.append(this.overlaysDiv, this.topbar);
   }
 
+  protected async joinStream() {
+    const rtc_data = `{
+      "fingerprints":[],
+      "pwd":"",
+      "ssrc":${Math.floor(Math.random() * 0xffffffff)},
+      "ssrc-groups":[],
+      "ufrag":""
+    }`
+
+    const joinInfo = await this.managers.appGroupCallsManager.joinGroupCall(this.groupCall.id, {
+      _: 'dataJSON',
+      data: rtc_data
+    }, {
+      type: 'main'
+    })
+
+    console.error(joinInfo)
+  }
+
+
+  protected async leaveStream() {
+    await this.managers.appGroupCallsManager.hangUp(this.groupCall.id, 0)
+  }
+
+
   protected setAuthorInfo(fromId: PeerId | string) {
     const isPeerId = fromId.isPeerId();
     let wrapTitlePromise: Promise<HTMLElement> | HTMLElement;
@@ -169,38 +193,36 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   }
 
   public async openStream() {
-    try {
-      this.setListeners();
-      const setAuthorPromise = this.setAuthorInfo(this.groupCall.chatId);
-      await setAuthorPromise;
+    await this.joinStream();
 
-      this.navigationItem = {
-        type: 'media',
-        onPop: (canAnimate) => {
-          if(this.setMoverAnimationPromise) {
-            return false;
-          }
+    this.setListeners();
+    const setAuthorPromise = this.setAuthorInfo(this.peerId);
+    await setAuthorPromise;
 
-          if(!canAnimate && IS_MOBILE_SAFARI) {
-            this.wholeDiv.remove();
-          }
-
-          this.close();
+    this.navigationItem = {
+      type: 'media',
+      onPop: (canAnimate) => {
+        if(this.setMoverAnimationPromise) {
+          return false;
         }
-      };
-      appNavigationController.pushItem(this.navigationItem);
 
-      this.toggleOverlay(true);
+        if(!canAnimate && IS_MOBILE_SAFARI) {
+          this.wholeDiv.remove();
+        }
 
-      if(!this.wholeDiv.parentElement) {
-        this.pageEl.insertBefore(this.wholeDiv, document.getElementById('main-columns'));
-        void this.wholeDiv.offsetLeft; // reflow
+        this.close();
       }
+    };
+    appNavigationController.pushItem(this.navigationItem);
 
-      this.toggleWholeActive(true);
-    } catch(e) {
-      console.error('XX ERORORORO', e)
+    this.toggleOverlay(true);
+
+    if(!this.wholeDiv.parentElement) {
+      this.pageEl.insertBefore(this.wholeDiv, document.getElementById('main-columns'));
+      void this.wholeDiv.offsetLeft; // reflow
     }
+
+    this.toggleWholeActive(true);
   }
 
   protected toggleWholeActive(active: boolean) {
@@ -219,6 +241,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       cancelEvent(e);
     }
 
+    this.leaveStream()
     this.closing = true;
 
     if(this.navigationItem) {
