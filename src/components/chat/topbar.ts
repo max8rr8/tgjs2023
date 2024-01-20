@@ -640,7 +640,6 @@ export default class ChatTopbar {
 
   private async onJoinGroupCallClick() {
     const chatFull = await this.managers.appProfileManager.getChatFull(this.peerId.toChatId());
-
     if(chatFull._ === 'channelFull' && this.chat.isBroadcast && !chatFull?.call?.id) {
       this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtsmpInfo => {
         PopupElement.createPopup(PopupStreamControl,  'stream-with', {
@@ -1005,11 +1004,6 @@ export default class ChatTopbar {
 
       this.joinStream.setCurrChatId(this.peerId.toChatId())
       this.btnGroupCall.classList.toggle('not-needed', this.chat.isBroadcast);
-
-      // @ts-ignore
-      rootScope.addEventListener('lalala', (call) => {
-        console.error('AAAAA', ...call, apiManagerProxy.getChat(peerId.toChatId()))
-      })
 
       // // TODO: popup down there is responsible
       // // for stream end. Yet to be removed.

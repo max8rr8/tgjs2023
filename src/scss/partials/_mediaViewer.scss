@@ -71,6 +71,11 @@ $inactive-opacity: .4;
       @include hover() {
         color: #fff;
       }
+
+    }
+
+    .white {
+      color: #fff !important;
     }
 
     @include respond-to(handhelds) {
@@ -514,6 +519,14 @@ $inactive-opacity: .4;
       @include hover() {
         opacity: 1;
       }
+    }
+
+    .opaque {
+      opacity: 1 !important;
+    }
+
+    .status {
+      color: var(--secondary-text-color);
     }
 
     &-left {

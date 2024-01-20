@@ -30,10 +30,15 @@ export default class PopupStreamControl extends PopupElement {
   // TODO: desctuctor !!!!!!!!!!!!
   constructor(private className: string, options: PopupStreamOptions) {
     const buttonText = document.createElement('p')
-    buttonText.innerText = 'Start Streaming';
-
     const titleText = document.createElement('span');
-    titleText.innerText = 'Stream With...'
+    if(options.isStartStream) {
+      buttonText.innerText = 'Start Streaming';
+      titleText.innerText = 'Stream With...'
+    } else {
+      buttonText.innerText = 'End Live Stream';
+      titleText.innerText = 'Stream Settings'
+    }
+
 
     super('popup-stream' + (className ? ' ' + className : ''), {
       title: titleText,

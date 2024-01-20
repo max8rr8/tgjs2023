@@ -12,6 +12,7 @@ import pause from '../helpers/schedulers/pause';
 import {GroupCall, InputGroupCall} from '../layer';
 import {GroupCallId} from '../lib/appManagers/appGroupCallsManager';
 import {AppManagers} from '../lib/appManagers/managers';
+import GroupCallInstance from '../lib/calls/groupCallInstance';
 import VideoPlayer from '../lib/mediaPlayer';
 import {NULL_PEER_ID} from '../lib/mtproto/mtproto_config';
 import wrapEmojiText from '../lib/richTextProcessor/wrapEmojiText';
@@ -25,6 +26,8 @@ import ButtonMenuToggle from './buttonMenuToggle';
 import GroupCallDescriptionElement from './groupCall/description';
 import PopupElement from './popups';
 import PopupForward from './popups/forward';
+import PopupPeer from './popups/peer';
+import PopupStreamControl from './popups/streamControl';
 import wrapPeerTitle from './wrappers/peerTitle';
 
 export const STREAM_VIEWER_CLASSNAME = 'media-viewer';
@@ -43,10 +46,12 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   protected ignoreNextClick: boolean;
   protected navigationItem: NavigationItem;
   protected listenerSetter: ListenerSetter;
+  protected callUpdateInterval: NodeJS.Timeout;
 
   protected btnMore: HTMLElement;
   protected liveTag: HTMLDivElement;
   protected description: GroupCallDescriptionElement;
+  protected isLive: boolean;
 
   protected pageEl = document.getElementById('page-chats') as HTMLDivElement;
   protected streamPlayer: VideoPlayer;
@@ -59,7 +64,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     avatarMiddlewareHelper?: MiddlewareHelper,
     container: HTMLElement,
     nameEl: HTMLElement,
-    date: HTMLElement
+    status: HTMLElement
   } = {} as any;
 
   constructor(protected peerId: PeerId, protected groupCall: InputGroupCall) {
@@ -85,16 +90,16 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
     // * author
     this.author.container = document.createElement('div');
-    this.author.container.classList.add(STREAM_VIEWER_CLASSNAME + '-author', 'no-select');
+    this.author.container.classList.add(STREAM_VIEWER_CLASSNAME + '-author', 'no-select', 'opaque');
     const authorRight = document.createElement('div');
 
     this.author.nameEl = document.createElement('div');
     this.author.nameEl.classList.add(STREAM_VIEWER_CLASSNAME + '-name');
 
-    this.author.date = document.createElement('div');
-    this.author.date.classList.add(STREAM_VIEWER_CLASSNAME + '-date');
+    this.author.status = document.createElement('div');
+    this.author.status.classList.add(STREAM_VIEWER_CLASSNAME + '-date', 'status');
 
-    authorRight.append(this.author.nameEl, this.author.date);
+    authorRight.append(this.author.nameEl, this.author.status);
 
     this.author.container.append(authorRight);
 
@@ -105,6 +110,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     (['forward', 'close'] as buttonsType[]).forEach((name) => {
       const button = ButtonIcon(name as Icon, {noRipple: true});
       this.buttons[name] = button;
+      this.buttons[name].classList.add('white', 'opaque');
       buttonsDiv.append(button);
     });
 
@@ -137,7 +143,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
         onPip: (pip) => {
           const otherMediaViewer = (window as any).appMediaViewer;
           if(!pip && otherMediaViewer && otherMediaViewer !== this) {
-            this.close();
+            this.leaveStream();
             return;
           }
 
@@ -154,8 +160,9 @@ export default class AppMediaViewerStream extends EventListenerBase<{
           }
         },
         onPipClose: () => {
-          this.close();
-        }
+          this.leaveStream();
+        },
+        showOnLeaveToClassName: 'media-viewer'
       });
 
       // add check for admin/user perspective
@@ -164,26 +171,24 @@ export default class AppMediaViewerStream extends EventListenerBase<{
         // listenerSetter: this.listenerSetter,
         direction: 'top-left',
         buttons: [{
-          // @ts-ignore
           icon: 'speaker',
           // @ts-ignore
           text: 'Output Device',
-          onClick: this.onOutputDevice
+          onClick: this.onOutputDevice.bind(this)
         },, /* {
             icon: 'radioon',
             text: 'Start Recording',
             onClick: this.onStartRecodring
           }*/ {
-          // @ts-ignore
             icon: 'crossround',
             // @ts-ignore
             text: 'Stream Settings',
-            onClick: this.onStreamSettings
+            onClick: this.onStreamSettings.bind(this)
           }, {
             icon: 'settings',
             // @ts-ignore
             text: 'End Live Stream',
-            onClick: this.onEndLiveStream,
+            onClick: this.onEndLiveStream.bind(this),
             danger: true
           }],
         onOpen: async(e, element) => {
@@ -194,14 +199,18 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       this.liveTag.classList.add('live-badge');
       // TODO: this should be a call to i18n
       this.liveTag.innerText = 'Live';
+      this.liveTag.classList.toggle('active', !!this.isLive);
 
+      const wrapper = video.parentElement;
+      const leftControls = wrapper.querySelector('.left-controls');
 
-      video.parentElement.querySelector('.progress-line').remove();
-      video.parentElement.querySelector('.left-controls').querySelector('.toggle').replaceWith(this.liveTag);
-      video.parentElement.querySelector('.time').remove();
-      video.parentElement.querySelector('.btn-menu-toggle').replaceWith(this.btnMore);
+      wrapper.querySelector('.progress-line').remove();
+      wrapper.querySelector('.default__button--big').remove()
+      leftControls.querySelector('.toggle').replaceWith(this.liveTag);
+      wrapper.querySelector('.time').remove();
+      wrapper.querySelector('.btn-menu-toggle').replaceWith(this.btnMore);
 
-      this.description = new GroupCallDescriptionElement(video.parentElement.querySelector('.left-controls'));
+      this.description = new GroupCallDescriptionElement(leftControls as HTMLElement);
       this.updateCall(this.groupCall.id);
 
       player.addEventListener('toggleControls', (show) => {
@@ -231,11 +240,31 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   }
 
   private onEndLiveStream() {
-
+    PopupElement.createPopup(PopupPeer, 'popup-end-video-chat', {
+      titleLangKey: 'VoiceChat.End.Third',
+      buttons: [{
+        isDanger: true,
+        langKey: 'Call.End',
+        callback: async(e) => {
+          this.hangUpAndClose(true)
+        }
+      }]
+    }).show();
   }
 
   private onStreamSettings() {
-
+    this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtsmpInfo => {
+      PopupElement.createPopup(PopupStreamControl,  'stream-settings', {
+        isStartStream: false,
+        peerId: this.peerId,
+        rtsmpInfo,
+        mainBtnCallback: async() => {
+          this.validateClose()
+        }
+      }).show();
+    }).catch(e => {
+      console.error('Cant open start with window, connecting to stream')
+    });
   }
 
   private onStartRecodring() {
@@ -258,7 +287,8 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     PopupElement.createPopup(PopupForward, {
       // [this.peerId]: [target.mid]
     }, () => {
-      return this.close();
+      // return this.close();
+      // here I should open pip, the chat to which was sent a message and do close only
     });
   };
 
@@ -309,6 +339,10 @@ export default class AppMediaViewerStream extends EventListenerBase<{
         },
         dcId
       })
+
+      // Lemme imagine this is real
+      this.isLive = true;
+
       console.log('STREAM DOWNLOAD', download)
       const arbuf = await download.arrayBuffer();
       console.log('stream buf', arbuf)
@@ -319,7 +353,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
 
   protected async leaveStream() {
-    await this.managers.appGroupCallsManager.hangUp(this.groupCall.id, 0)
+    await this.validateClose();
   }
 
 
@@ -355,7 +389,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       wrapTitlePromise
     ]).then(([_, title]) => {
       // TODO: i18n lacks 'streaming' word
-      replaceContent(this.author.date, 'Streaming');
+      replaceContent(this.author.status, 'streaming');
       replaceContent(this.author.nameEl, title);
 
       if(oldAvatar?.node && oldAvatar.node.parentElement) {
@@ -389,7 +423,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
           this.wholeDiv.remove();
         }
 
-        this.close();
+        this.leaveStream();
       }
     };
     appNavigationController.pushItem(this.navigationItem);
@@ -417,12 +451,41 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     }
   }
 
+  private hangUpAndClose = async(discard: boolean | number) => {
+    await this.managers.appGroupCallsManager.hangUp(this.groupCall.id, discard)
+    this.close();
+  }
+
+  private async validateClose() {
+    if(await this.managers.appChatsManager.hasRights(this.peerId.toChatId(), 'manage_call')) {
+      PopupElement.createPopup(PopupPeer, 'popup-end-video-chat', {
+        titleLangKey: 'VoiceChat.End.Title',
+        descriptionLangKey: 'VoiceChat.End.Text',
+        checkboxes: [{
+          text: 'VoiceChat.End.Third'
+        }],
+        buttons: [{
+          isDanger: true,
+          langKey: 'VoiceChat.End.OK',
+          callback: async(e, checkboxes) => {
+            if(!!checkboxes.size) {
+              this.hangUpAndClose(true);
+            } else {
+              this.hangUpAndClose(0)
+            }
+          }
+        }]
+      }).show();
+    } else {
+      this.hangUpAndClose(0)
+    }
+  }
+
   public close(e?: MouseEvent) {
     if(e) {
       cancelEvent(e);
     }
 
-    this.leaveStream()
     this.closing = true;
 
     if(this.navigationItem) {
@@ -434,6 +497,10 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     if((window as any).appMediaViewer === this) {
       (window as any).appMediaViewer = undefined;
     }
+
+    clearInterval(this.callUpdateInterval);
+
+    this.streamPlayer.cleanup();
 
     this.wholeDiv.remove();
     this.toggleOverlay(false);
@@ -447,7 +514,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
   protected setListeners() {
     [this.buttons.close, this.buttons['mobile-close']].forEach((el) => {
-      attachClickEvent(el, this.close.bind(this));
+      attachClickEvent(el, this.leaveStream.bind(this));
     });
 
     attachClickEvent(this.buttons.forward, this.onForwardClick);
@@ -456,7 +523,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     });
     this.wholeDiv.addEventListener('click', this.onClick);
 
-    setInterval(() => {
+    this.callUpdateInterval = setInterval(() => {
       this.updateCall(this.groupCall.id)
     }, 1e3)
   }

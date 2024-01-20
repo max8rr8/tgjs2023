@@ -54,7 +54,8 @@ export default class VideoPlayer extends ControlsHover {
     duration,
     onPlaybackRackMenuToggle,
     onPip,
-    onPipClose
+    onPipClose,
+    showOnLeaveToClassName
   }: {
     video: HTMLVideoElement,
     play?: boolean,
@@ -62,7 +63,8 @@ export default class VideoPlayer extends ControlsHover {
     duration?: number,
     onPlaybackRackMenuToggle?: VideoPlayer['onPlaybackRackMenuToggle'],
     onPip?: VideoPlayer['onPip'],
-    onPipClose?: VideoPlayer['onPipClose']
+    onPipClose?: VideoPlayer['onPipClose'],
+    showOnLeaveToClassName: string
   }) {
     super();
 
@@ -82,7 +84,7 @@ export default class VideoPlayer extends ControlsHover {
       canHideControls: () => {
         return !this.video.paused && (!this.playbackRateButton || !this.playbackRateButton.classList.contains('menu-open'));
       },
-      showOnLeaveToClassName: 'media-viewer-caption',
+      showOnLeaveToClassName,
       ignoreClickClassName: 'ckin__controls'
     });
 

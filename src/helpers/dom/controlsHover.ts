@@ -67,7 +67,6 @@ export default class ControlsHover extends EventListenerBase<{
       });
 
       listenerSetter.add(element)('mouseleave', (e) => {
-        // console.error('XX mouse leave', e.relatedTarget, this.showOnLeaveToClassName, findUpClassName(e.relatedTarget, this.showOnLeaveToClassName))
         if(e.relatedTarget && this.showOnLeaveToClassName && findUpClassName(e.relatedTarget, this.showOnLeaveToClassName)) {
           this.showControls(false);
           return;
@@ -116,6 +115,7 @@ export default class ControlsHover extends EventListenerBase<{
       return;
     }
 
+    // console.error('XX 4')
     this.hideControlsTimeout = window.setTimeout(this.hideControls, 3e3);
   };
 

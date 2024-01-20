@@ -1790,7 +1790,8 @@ export default class AppMediaViewerBase<
                   // this.toggleWholeActive(false);
                   // this.toggleOverlay(false);
                   this.close();
-                }
+                },
+                showOnLeaveToClassName: 'media-viewer-caption'
               });
               player.addEventListener('toggleControls', (show) => {
                 this.wholeDiv.classList.toggle('has-video-controls', show);
