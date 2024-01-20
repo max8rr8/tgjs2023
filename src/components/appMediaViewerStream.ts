@@ -5,19 +5,26 @@ import createVideo from '../helpers/dom/createVideo';
 import findUpClassName from '../helpers/dom/findUpClassName';
 import replaceContent from '../helpers/dom/replaceContent';
 import EventListenerBase from '../helpers/eventListenerBase';
+import ListenerSetter from '../helpers/listenerSetter';
 import {MiddlewareHelper, getMiddleware} from '../helpers/middleware';
 import overlayCounter from '../helpers/overlayCounter';
 import pause from '../helpers/schedulers/pause';
-import {InputGroupCall} from '../layer';
+import {GroupCall, InputGroupCall} from '../layer';
+import {GroupCallId} from '../lib/appManagers/appGroupCallsManager';
 import {AppManagers} from '../lib/appManagers/managers';
 import VideoPlayer from '../lib/mediaPlayer';
 import {NULL_PEER_ID} from '../lib/mtproto/mtproto_config';
 import wrapEmojiText from '../lib/richTextProcessor/wrapEmojiText';
 import rootScope from '../lib/rootScope';
 import animationIntersector from './animationIntersector';
+import appMediaPlaybackController from './appMediaPlaybackController';
 import appNavigationController, {NavigationItem} from './appNavigationController';
 import {avatarNew} from './avatarNew';
 import ButtonIcon from './buttonIcon';
+import ButtonMenuToggle from './buttonMenuToggle';
+import GroupCallDescriptionElement from './groupCall/description';
+import PopupElement from './popups';
+import PopupForward from './popups/forward';
 import wrapPeerTitle from './wrappers/peerTitle';
 
 export const STREAM_VIEWER_CLASSNAME = 'media-viewer';
@@ -33,16 +40,20 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   protected middlewareHelper: MiddlewareHelper;
   protected setMoverAnimationPromise: Promise<void>;
   protected closing: boolean;
-  protected tempId = 0;
   protected ignoreNextClick: boolean;
   protected navigationItem: NavigationItem;
+  protected listenerSetter: ListenerSetter;
+
+  protected btnMore: HTMLElement;
+  protected liveTag: HTMLDivElement;
+  protected description: GroupCallDescriptionElement;
 
   protected pageEl = document.getElementById('page-chats') as HTMLDivElement;
-  protected videoPlayer: VideoPlayer;
+  protected streamPlayer: VideoPlayer;
   protected managers: AppManagers;
   protected topbar: HTMLElement;
   protected buttons: {[k in buttonsType]: HTMLElement} = {} as any;
-  protected content: {[k in 'main' | 'container' | 'media']: HTMLElement} = {} as any;
+  protected content: {[k in 'main' | 'container' | 'media' | 'caption']: HTMLElement} = {} as any;
   protected author: {
     avatarEl: ReturnType<typeof avatarNew>,
     avatarMiddlewareHelper?: MiddlewareHelper,
@@ -55,6 +66,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     super(false);
     this.managers = rootScope.managers;
     this.middlewareHelper = getMiddleware();
+    this.listenerSetter = new ListenerSetter();
 
     this.wholeDiv = document.createElement('div');
     this.wholeDiv.classList.add(STREAM_VIEWER_CLASSNAME + '-whole');
@@ -111,16 +123,145 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     video.src = 'stream/%7B%22dcId%22%3A2%2C%22location%22%3A%7B%22_%22%3A%22inputDocumentFileLocation%22%2C%22id%22%3A%225199710476254067157%22%2C%22access_hash%22%3A%22-1202662833049742147%22%2C%22file_reference%22%3A%5B4%2C124%2C101%2C233%2C203%2C0%2C0%2C0%2C23%2C101%2C167%2C128%2C107%2C166%2C204%2C145%2C34%2C102%2C3%2C26%2C12%2C123%2C208%2C169%2C68%2C156%2C1%2C40%2C41%5D%7D%2C%22size%22%3A4541349%2C%22mimeType%22%3A%22video%2Fmp4%22%2C%22fileName%22%3A%22IMG_9853.MOV%22%7D';
     // video.src = 'stream/%7B%22dcId%22%3A2%2C%22location%22%3A%7B%22_%22%3A%22inputDocumentFileLocation%22%2C%22id%22%3A%225283272299108120583%22%2C%22access_hash%22%3A%22-6833039415976833006%22%2C%22file_reference%22%3A%5B1%2C0%2C9%2C75%2C76%2C101%2C170%2C43%2C109%2C218%2C9%2C168%2C125%2C111%2C201%2C22%2C67%2C235%2C76%2C2%2C25%2C252%2C215%2C80%2C92%5D%7D%2C%22size%22%3A337461%2C%22mimeType%22%3A%22video%2Fmp4%22%7D'
 
-    const videoWrap = document.createElement('div');
     this.content.container.append(video);
     this.overlaysDiv.append(mainDiv);
     // * overlays end
+
+    const createPlayer = () => {
+      video.dataset.ckin = 'default';
+      video.dataset.overlay = '1';
+
+      const player = this.streamPlayer = new VideoPlayer({
+        video,
+        // streamable: supportsStreaming,
+        onPip: (pip) => {
+          const otherMediaViewer = (window as any).appMediaViewer;
+          if(!pip && otherMediaViewer && otherMediaViewer !== this) {
+            this.close();
+            return;
+          }
+
+          this.toggleWholeActive(!pip);
+          this.toggleOverlay(!pip);
+
+          if(this.navigationItem) {
+            if(pip) appNavigationController.removeItem(this.navigationItem);
+            else appNavigationController.pushItem(this.navigationItem);
+          }
+
+          if(pip) {
+            appMediaPlaybackController.setPictureInPicture(video);
+          }
+        },
+        onPipClose: () => {
+          this.close();
+        }
+      });
+
+      // add check for admin/user perspective
+      // TODO: fix all i18n lines
+      this.btnMore = ButtonMenuToggle({
+        // listenerSetter: this.listenerSetter,
+        direction: 'top-left',
+        buttons: [{
+          // @ts-ignore
+          icon: 'speaker',
+          // @ts-ignore
+          text: 'Output Device',
+          onClick: this.onOutputDevice
+        },, /* {
+            icon: 'radioon',
+            text: 'Start Recording',
+            onClick: this.onStartRecodring
+          }*/ {
+          // @ts-ignore
+            icon: 'crossround',
+            // @ts-ignore
+            text: 'Stream Settings',
+            onClick: this.onStreamSettings
+          }, {
+            icon: 'settings',
+            // @ts-ignore
+            text: 'End Live Stream',
+            onClick: this.onEndLiveStream,
+            danger: true
+          }],
+        onOpen: async(e, element) => {
+        }
+      });
+      this.btnMore.classList.add('more');
+      this.liveTag = document.createElement('div');
+      this.liveTag.classList.add('live-badge');
+      // TODO: this should be a call to i18n
+      this.liveTag.innerText = 'Live';
+
+
+      video.parentElement.querySelector('.progress-line').remove();
+      video.parentElement.querySelector('.left-controls').querySelector('.toggle').replaceWith(this.liveTag);
+      video.parentElement.querySelector('.time').remove();
+      video.parentElement.querySelector('.btn-menu-toggle').replaceWith(this.btnMore);
+
+      this.description = new GroupCallDescriptionElement(video.parentElement.querySelector('.left-controls'));
+      this.updateCall(this.groupCall.id);
+
+      player.addEventListener('toggleControls', (show) => {
+        this.wholeDiv.classList.toggle('has-video-controls', show);
+      });
+    };
+
+    try {
+      createPlayer();
+    } catch(e) {
+      console.error('XX video err', e)
+    }
 
     topbarLeft.append(this.buttons['mobile-close'], this.author.container);
     topbar.append(topbarLeft, buttonsDiv);
 
     this.wholeDiv.append(this.overlaysDiv, this.topbar);
   }
+
+  private async updateCall(groupCallId: GroupCallId) {
+    if(this.groupCall?.id !== groupCallId) return;
+    const fullGroupCall = await this.managers.appGroupCallsManager.getGroupCallFull(this.groupCall.id);
+
+    if((fullGroupCall as GroupCall.groupCall).participants_count >= 0) {
+      this.description.update(fullGroupCall as GroupCall.groupCall);
+    }
+  }
+
+  private onEndLiveStream() {
+
+  }
+
+  private onStreamSettings() {
+
+  }
+
+  private onStartRecodring() {
+
+  }
+
+  private onOutputDevice() {
+
+  }
+
+  private onForwardClick = () => {
+    // this.managers.apiManager.invokeApi('phone.exportGroupCallInvite', {
+    //   can_self_unmute: false,
+    //   call: this.groupCall
+    // }).then((res) => {
+    //   console.error('XX link acq', res)
+    // })
+    // maybe should create a message with this link as contents and then
+    // pass it to PopupForward;
+    PopupElement.createPopup(PopupForward, {
+      // [this.peerId]: [target.mid]
+    }, () => {
+      return this.close();
+    });
+  };
+
 
   protected async joinStream() {
     const rtc_data = `{
@@ -290,7 +431,6 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
     this.author.avatarMiddlewareHelper?.destroy();
 
-    this.tempId = -1;
     if((window as any).appMediaViewer === this) {
       (window as any).appMediaViewer = undefined;
     }
@@ -310,7 +450,15 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       attachClickEvent(el, this.close.bind(this));
     });
 
+    attachClickEvent(this.buttons.forward, this.onForwardClick);
+    this.listenerSetter.add(rootScope)('group_call_update', (groupCall) => {
+      this.updateCall(groupCall.id);
+    });
     this.wholeDiv.addEventListener('click', this.onClick);
+
+    setInterval(() => {
+      this.updateCall(this.groupCall.id)
+    }, 1e3)
   }
 
   // NOT SURE

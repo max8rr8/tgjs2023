@@ -24,15 +24,20 @@ export default class GroupCallDescriptionElement {
     this.descriptionIntl.element.remove();
   }
 
-  public update(instance: GroupCallInstance) {
-    const {state} = instance;
-
+  public update(instance: GroupCallInstance | GroupCall.groupCall) {
     let key: LangPackKey, args: FormatterArguments;
-    if(state === GROUP_CALL_STATE.CONNECTING) {
-      key = 'VoiceChat.Status.Connecting';
-    } else {
+    if((instance as GroupCall.groupCall)._ === 'groupCall') {
       key = 'VoiceChat.Status.Members';
-      args = [(instance.groupCall as GroupCall.groupCall).participants_count];
+      args = [(instance as GroupCall.groupCall).participants_count];
+    } else {
+      const {state} = instance as GroupCallInstance;
+
+      if(state === GROUP_CALL_STATE.CONNECTING) {
+        key = 'VoiceChat.Status.Connecting';
+      } else {
+        key = 'VoiceChat.Status.Members';
+        args = [((instance as GroupCallInstance).groupCall as GroupCall.groupCall).participants_count];
+      }
     }
 
     const {descriptionIntl} = this;

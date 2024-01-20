@@ -2,7 +2,6 @@ import PopupElement, {PopupButton, PopupOptions} from '.';
 import {copyTextToClipboard} from '../../helpers/clipboard';
 import cancelEvent from '../../helpers/dom/cancelEvent';
 import {attachClickEvent} from '../../helpers/dom/clickEvent';
-import Icons from '../../icons';
 import {PhoneGroupCallStreamRtmpUrl} from '../../layer';
 import I18n, {LangPackKey, i18n} from '../../lib/langPack';
 import ButtonIcon from '../buttonIcon';
