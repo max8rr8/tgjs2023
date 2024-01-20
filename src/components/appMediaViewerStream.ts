@@ -9,10 +9,9 @@ import ListenerSetter from '../helpers/listenerSetter';
 import {MiddlewareHelper, getMiddleware} from '../helpers/middleware';
 import overlayCounter from '../helpers/overlayCounter';
 import pause from '../helpers/schedulers/pause';
-import {GroupCall, InputGroupCall} from '../layer';
+import {Chat, GroupCall, InputGroupCall} from '../layer';
 import {GroupCallId} from '../lib/appManagers/appGroupCallsManager';
 import {AppManagers} from '../lib/appManagers/managers';
-import GroupCallInstance from '../lib/calls/groupCallInstance';
 import VideoPlayer from '../lib/mediaPlayer';
 import {NULL_PEER_ID} from '../lib/mtproto/mtproto_config';
 import wrapEmojiText from '../lib/richTextProcessor/wrapEmojiText';
@@ -59,6 +58,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   protected topbar: HTMLElement;
   protected buttons: {[k in buttonsType]: HTMLElement} = {} as any;
   protected content: {[k in 'main' | 'container' | 'media' | 'caption']: HTMLElement} = {} as any;
+  private menuButtons: Parameters<typeof ButtonMenuToggle>[0]['buttons'];
   protected author: {
     avatarEl: ReturnType<typeof avatarNew>,
     avatarMiddlewareHelper?: MiddlewareHelper,
@@ -133,7 +133,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     this.overlaysDiv.append(mainDiv);
     // * overlays end
 
-    const createPlayer = () => {
+    const createPlayer = async() => {
       video.dataset.ckin = 'default';
       video.dataset.overlay = '1';
 
@@ -165,35 +165,44 @@ export default class AppMediaViewerStream extends EventListenerBase<{
         showOnLeaveToClassName: 'media-viewer'
       });
 
-      // add check for admin/user perspective
+      this.menuButtons = [{
+        icon: 'speaker',
+        // @ts-ignore
+        text: 'Output Device',
+        onClick: this.onOutputDevice.bind(this)
+      }, /* {
+          icon: 'radioon',
+          text: 'Start Recording',
+          onClick: this.onStartRecodring
+        }*/ {
+        icon: 'crossround',
+        // @ts-ignore
+        text: 'End Live Stream',
+        onClick: this.onEndLiveStream.bind(this),
+        danger: true
+      }]
+
+      const chat = await this.managers.appChatsManager.getChat(this.peerId.toChatId());
+      if(chat) {
+        if((chat as Chat.chat)?.pFlags?.creator) {
+          this.menuButtons.splice(1, 0, {
+            icon: 'settings',
+            // @ts-ignore
+            text: 'Stream Settings',
+            onClick: this.onStreamSettings.bind(this)
+          })
+        }
+      }
+
       // TODO: fix all i18n lines
       this.btnMore = ButtonMenuToggle({
         // listenerSetter: this.listenerSetter,
         direction: 'top-left',
-        buttons: [{
-          icon: 'speaker',
-          // @ts-ignore
-          text: 'Output Device',
-          onClick: this.onOutputDevice.bind(this)
-        },, /* {
-            icon: 'radioon',
-            text: 'Start Recording',
-            onClick: this.onStartRecodring
-          }*/ {
-            icon: 'crossround',
-            // @ts-ignore
-            text: 'Stream Settings',
-            onClick: this.onStreamSettings.bind(this)
-          }, {
-            icon: 'settings',
-            // @ts-ignore
-            text: 'End Live Stream',
-            onClick: this.onEndLiveStream.bind(this),
-            danger: true
-          }],
+        buttons: this.menuButtons,
         onOpen: async(e, element) => {
         }
       });
+
       this.btnMore.classList.add('more');
       this.liveTag = document.createElement('div');
       this.liveTag.classList.add('live-badge');
@@ -218,11 +227,9 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       });
     };
 
-    try {
-      createPlayer();
-    } catch(e) {
-      console.error('XX video err', e)
-    }
+    createPlayer().catch((e) => {
+      console.error('XX stream create player error ', e)
+    });
 
     topbarLeft.append(this.buttons['mobile-close'], this.author.container);
     topbar.append(topbarLeft, buttonsDiv);
@@ -240,24 +247,28 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   }
 
   private onEndLiveStream() {
-    PopupElement.createPopup(PopupPeer, 'popup-end-video-chat', {
-      titleLangKey: 'VoiceChat.End.Third',
-      buttons: [{
-        isDanger: true,
-        langKey: 'Call.End',
-        callback: async(e) => {
-          this.hangUpAndClose(true)
-        }
-      }]
-    }).show();
+    this.managers.appChatsManager.hasRights(this.peerId.toChatId(), 'manage_call').then((hasRights) => {
+      if(hasRights) {
+        PopupElement.createPopup(PopupPeer, 'popup-end-video-chat', {
+          titleLangKey: 'VoiceChat.End.Third',
+          buttons: [{
+            isDanger: true,
+            langKey: 'Call.End',
+            callback: async(e) => {
+              this.hangUpAndClose(true)
+            }
+          }]
+        }).show();
+      }
+    })
   }
 
   private onStreamSettings() {
-    this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtsmpInfo => {
+    this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtmpInfo => {
       PopupElement.createPopup(PopupStreamControl,  'stream-settings', {
         isStartStream: false,
         peerId: this.peerId,
-        rtsmpInfo,
+        rtmpInfo,
         mainBtnCallback: async() => {
           this.validateClose()
         }

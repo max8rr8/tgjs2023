@@ -12,7 +12,7 @@ import {toast} from '../toast';
 export type PopupStreamOptions = {
   peerId: PeerId,
   isStartStream: boolean,
-  rtsmpInfo: PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl,
+  rtmpInfo: PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl,
   mainBtnCallback: () => void
 };
 
@@ -21,11 +21,12 @@ export default class PopupStreamControl extends PopupElement {
   private btnMore: HTMLElement;
   private toggleVisible: HTMLElement;
   private passwordVisible = false;
-  private passwordEl: HTMLDivElement;
+  private streamKeyEl: HTMLDivElement;
+  private serverUrlEl: HTMLDivElement;
 
-  private menuButtons: Parameters<typeof ButtonMenuToggle>[0]['buttons'];
   private serverURL: string;
   private streamKey: string;
+  private peerId: PeerId;
 
   // TODO: desctuctor !!!!!!!!!!!!
   constructor(private className: string, options: PopupStreamOptions) {
@@ -54,25 +55,28 @@ export default class PopupStreamControl extends PopupElement {
       body: true
     });
 
-    this.serverURL = options.rtsmpInfo.url;
-    this.streamKey = options.rtsmpInfo.key;
+    this.serverURL = options.rtmpInfo.url;
+    this.streamKey = options.rtmpInfo.key;
+    this.peerId = options.peerId;
 
-    //* TODO: more button
+    // //* TODO: more button
     this.btnMore = ButtonMenuToggle({
       listenerSetter: this.listenerSetter,
       direction: 'bottom-left',
-      buttons: this.menuButtons,
-      onOpen: async(e, element) => {
-        const deleteButton = this.menuButtons[this.menuButtons.length - 1];
-        // if(deleteButton?.element) {
-        //   const deleteButtonText = await this.managers.appPeersManager.getDeleteButtonText(this.peerId);
-        //   deleteButton.element.lastChild.replaceWith(i18n(deleteButtonText));
-        // }
-      }
+      buttons: [{
+        icon: 'rotate_left',
+        // @ts-ignore
+        text: 'Revoke Stream Key',
+        danger: true,
+        onClick: this.revokeStreamKey.bind(this)
+      }],
+      onOpen: async(e, element) => {}
     });
     this.btnMore.classList.add('more');
 
-    this.header.append(this.btnMore);
+    if(options.isStartStream) {
+      this.header.append(this.btnMore);
+    }
 
     //* body
     const fragment = document.createDocumentFragment();
@@ -104,9 +108,7 @@ export default class PopupStreamControl extends PopupElement {
       btnRevoke.append(Icon('rotate_left', 'row-icon'), revokeText);
       fragment.append(btnRevoke);
 
-      attachClickEvent(btnRevoke, () => {
-        console.error('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
-      })
+      attachClickEvent(btnRevoke, this.revokeStreamKey.bind(this))
     }
 
     this.body.append(fragment);
@@ -119,6 +121,19 @@ export default class PopupStreamControl extends PopupElement {
     } else {
       this.btnMain.classList.add('end');
     }
+  }
+
+  private revokeStreamKey() {
+    this.managers.appGroupCallsManager.getURLAndKey(this.peerId, true).then((rtmpInfo) => {
+      this.serverURL = rtmpInfo.url;
+      this.streamKey = rtmpInfo.key;
+
+      this.serverUrlEl.replaceChildren();
+      this.streamKeyEl.replaceChildren();
+
+      this.serverUrlEl.append(this.serverURL);
+      this.streamKeyEl.append(this.passwordVisible ? this.streamKey : '·'.repeat(this.streamKey.length));
+    })
   }
 
   private addText(appendTo: DocumentFragment, text:/* LangPackKey */ string) {
@@ -142,6 +157,11 @@ export default class PopupStreamControl extends PopupElement {
     // TODO: this should be a call to i18n
     rowSubtitle.append(options.rowSubtitle);
 
+    const rowTitle = document.createElement('div');
+    rowTitle.classList.add('row-title');
+    rowTitle.setAttribute('dir', 'auto');
+    rowTitle.append(this.passwordVisible || !options.isKey ? options.rowTitle : '·'.repeat(options.rowTitle.length));
+
     if(options?.isKey) {
       const toggleVisible = this.toggleVisible = document.createElement('span');
       toggleVisible.classList.add('toggle-visible');
@@ -149,12 +169,10 @@ export default class PopupStreamControl extends PopupElement {
       rowSubtitle.append(toggleVisible);
       toggleVisible.addEventListener('click', this.onVisibilityClick);
       toggleVisible.addEventListener('touchend', this.onVisibilityClick);
+      this.streamKeyEl = rowTitle;
+    } else {
+      this.serverUrlEl = rowTitle;
     }
-
-    const rowTitle = this.passwordEl = document.createElement('div');
-    rowTitle.classList.add('row-title');
-    rowTitle.setAttribute('dir', 'auto');
-    rowTitle.append(this.passwordVisible || !options.isKey ? options.rowTitle : '·'.repeat(options.rowTitle.length));
 
     const row = document.createElement('div');
     row.classList.add('row', 'row-with-icon', 'row-with-padding');
@@ -180,7 +198,7 @@ export default class PopupStreamControl extends PopupElement {
     this.passwordVisible = !this.passwordVisible;
 
     this.toggleVisible.replaceChildren(Icon(this.passwordVisible ? 'eye2' : 'eye1'));
-    this.passwordEl.replaceChildren();
-    this.passwordEl.append(this.passwordVisible ? this.streamKey : '·'.repeat(this.streamKey.length) )
+    this.streamKeyEl.replaceChildren();
+    this.streamKeyEl.append(this.passwordVisible ? this.streamKey : '·'.repeat(this.streamKey.length) )
   };
 }

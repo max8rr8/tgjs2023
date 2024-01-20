@@ -641,11 +641,11 @@ export default class ChatTopbar {
   private async onJoinGroupCallClick() {
     const chatFull = await this.managers.appProfileManager.getChatFull(this.peerId.toChatId());
     if(chatFull._ === 'channelFull' && this.chat.isBroadcast && !chatFull?.call?.id) {
-      this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtsmpInfo => {
+      this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtmpInfo => {
         PopupElement.createPopup(PopupStreamControl,  'stream-with', {
           isStartStream: true,
           peerId: this.peerId,
-          rtsmpInfo,
+          rtmpInfo,
           mainBtnCallback: async() => {
             const groupCall = await this.managers.appGroupCallsManager.createGroupCall(this.peerId.toChatId(), {
               rtmpStream: true
@@ -1004,30 +1004,6 @@ export default class ChatTopbar {
 
       this.joinStream.setCurrChatId(this.peerId.toChatId())
       this.btnGroupCall.classList.toggle('not-needed', this.chat.isBroadcast);
-
-      // // TODO: popup down there is responsible
-      // // for stream end. Yet to be removed.
-      // const tempText1 = document.createElement('p')
-      // tempText1.innerText = 'End Live Stream';
-      // const tempTitle1 = document.createElement('span');
-      // tempTitle1.innerText = 'Stream Settings'
-
-
-      // PopupElement.createPopup(PopupStreamControl, 'stream-settings', {
-      //   titleLangKey: 'DiscardVoiceMessageTitle',
-      //   mainButton: {
-      //     // langKey: 'DiscardVoiceMessageAction', // TODO langKey is used if only there's no text
-      //     text: tempText1, // TODO: add Start Streaming i18n and remove this
-      //     noRipple: true,
-      //     callback: () => {
-      //       console.error('AAAAAAAA FIX ME')
-      //     }
-      //   },
-      //   closable: true,
-      //   title: tempTitle1, // TODO: use langPackKey, but first add it somewhere...
-      //   isStartStream: false
-      // }).show();
-
 
       setTitleCallback();
       setStatusCallback?.();

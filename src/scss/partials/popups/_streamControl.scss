@@ -59,6 +59,7 @@
                 width: calc(100% - var(--spacing));
                 height: 100%;
                 background-color: var(--light-danger-color);
+                cursor: pointer;
             }
 
             .row-icon {
