@@ -288,27 +288,21 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   }
 
   private onForwardClick = () => {
-    // this.managers.apiManager.invokeApi('phone.exportGroupCallInvite', {
-    //   can_self_unmute: false,
-    //   call: this.groupCall
-    // }).then((res) => {
-    //   console.error('XX link acq', res)
-    // })
-    // maybe should create a message with this link as contents and then
-    // pass it to PopupForward;
-    const peerId = this.peerId;
-    PopupPickUser.createSharingPicker({
-      onSelect: (peerId) => {
-        this.managers.appMessagesManager.sendText({
-          peerId,
-          text: 'hi'
-        });
-        // this.managers.appImManager.setInnerPeer({peerId});
-      }})
-    //  () => {
-    // return this.close();
-    // here I should open pip, the chat to which was sent a message and do close only
-    // });
+    this.managers.apiManager.invokeApi('phone.exportGroupCallInvite', {
+      can_self_unmute: false,
+      call: this.groupCall
+    }).then((text) => {
+      PopupElement.createPopup(PopupPickUser, {
+        onMultiSelect: (peerIds) => {
+          for(const peerId of peerIds) {
+            this.managers.appMessagesManager.sendText({
+              peerId,
+              text: text.link
+            });
+          }
+        }
+      })
+    })
   };
 
 
