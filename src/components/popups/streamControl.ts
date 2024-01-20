@@ -7,6 +7,7 @@ import I18n, {LangPackKey, i18n} from '../../lib/langPack';
 import ButtonIcon from '../buttonIcon';
 import ButtonMenuToggle from '../buttonMenuToggle';
 import Icon from '../icon';
+import ripple from '../ripple';
 import {toast} from '../toast';
 
 export type PopupStreamOptions = {
@@ -59,7 +60,6 @@ export default class PopupStreamControl extends PopupElement {
     this.streamKey = options.rtmpInfo.key;
     this.peerId = options.peerId;
 
-    // //* TODO: more button
     this.btnMore = ButtonMenuToggle({
       listenerSetter: this.listenerSetter,
       direction: 'bottom-left',
@@ -98,6 +98,7 @@ export default class PopupStreamControl extends PopupElement {
     } else {
       const btnRevoke = document.createElement('div');
       btnRevoke.classList.add('row', 'row-with-icon', 'row-with-padding', 'red');
+      ripple(btnRevoke);
 
       // TODO: here should be a call to i18n returning span;
       const revokeText = document.createElement('span');
@@ -114,7 +115,7 @@ export default class PopupStreamControl extends PopupElement {
     this.body.append(fragment);
 
     //* main button
-    this.btnMain =  this.buttonsEl.getElementsByClassName('btn')[0] as HTMLButtonElement;
+    this.btnMain = this.buttonsEl.getElementsByClassName('btn')[0] as HTMLButtonElement;
     this.btnMain.classList.remove('primary');
     if(options?.isStartStream) {
       this.btnMain.classList.add('start');

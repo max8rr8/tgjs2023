@@ -47,17 +47,20 @@
     .popup-body {
 
         .red {
-
-            &:hover::after { 
+            overflow: hidden;
+            height: 100%;
+            
+            .c-ripple:hover::after { 
                 content: ' ';
-                border-radius: 16px;
-                margin: 0 -var(--spacing) 0.2rem var(--spacing);
                 position: absolute;
                 z-index: 10 !important;
                 top: 0;
                 left: var(--half-spacing);
                 width: calc(100% - var(--spacing));
                 height: 100%;
+                border-radius: 16px;
+
+
                 background-color: var(--light-danger-color);
                 cursor: pointer;
             }
@@ -126,14 +129,4 @@
         }
          
     }
-}
-
-.temptemptemp {
-    width: 50%;
-    height: 30%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    top: calc(25%);
-    left: calc(25%);
 }

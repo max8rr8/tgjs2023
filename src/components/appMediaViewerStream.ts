@@ -26,6 +26,7 @@ import GroupCallDescriptionElement from './groupCall/description';
 import PopupElement from './popups';
 import PopupForward from './popups/forward';
 import PopupPeer from './popups/peer';
+import PopupPickUser from './popups/pickUser';
 import PopupStreamControl from './popups/streamControl';
 import wrapPeerTitle from './wrappers/peerTitle';
 
@@ -295,12 +296,19 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     // })
     // maybe should create a message with this link as contents and then
     // pass it to PopupForward;
-    PopupElement.createPopup(PopupForward, {
-      // [this.peerId]: [target.mid]
-    }, () => {
-      // return this.close();
-      // here I should open pip, the chat to which was sent a message and do close only
-    });
+    const peerId = this.peerId;
+    PopupPickUser.createSharingPicker({
+      onSelect: (peerId) => {
+        this.managers.appMessagesManager.sendText({
+          peerId,
+          text: 'hi'
+        });
+        // this.managers.appImManager.setInnerPeer({peerId});
+      }})
+    //  () => {
+    // return this.close();
+    // here I should open pip, the chat to which was sent a message and do close only
+    // });
   };
 
 
