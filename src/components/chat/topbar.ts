@@ -412,12 +412,12 @@ export default class ChatTopbar {
     }, {
       icon: 'videochat',
       text: 'PeerInfo.Action.LiveStream',
-      onClick: this.onJoinGroupCallClick,
+      onClick: this.onJoinGroupCallClick.bind(this),
       verify: this.verifyVideoChatButton.bind(this, 'broadcast')
     }, {
       icon: 'videochat',
       text: 'PeerInfo.Action.VoiceChat',
-      onClick: this.onJoinGroupCallClick,
+      onClick: this.onJoinGroupCallClick.bind(this),
       verify: this.verifyVideoChatButton.bind(this, 'group')
     }, {
       icon: 'topics',
@@ -688,7 +688,7 @@ export default class ChatTopbar {
     this.btnMute = ButtonIcon('mute');
 
     this.attachClickEvent(this.btnCall, this.onCallClick.bind(this, 'voice'));
-    this.attachClickEvent(this.btnGroupCall, this.onJoinGroupCallClick);
+    this.attachClickEvent(this.btnGroupCall, this.onJoinGroupCallClick.bind(this));
 
     this.attachClickEvent(this.btnPinned, () => {
       this.openPinned(true);
