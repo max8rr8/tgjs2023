@@ -8,7 +8,7 @@ import EventListenerBase from '../helpers/eventListenerBase';
 import ListenerSetter from '../helpers/listenerSetter';
 import {MiddlewareHelper, getMiddleware} from '../helpers/middleware';
 import overlayCounter from '../helpers/overlayCounter';
-import {Chat, PhoneGroupCallStreamRtmpUrl} from '../layer';
+import {Chat, GroupCall, PhoneGroupCallStreamRtmpUrl} from '../layer';
 import {AppManagers} from '../lib/appManagers/managers';
 import {LiveStream} from '../lib/calls/livestream/livestream';
 import VideoPlayer from '../lib/mediaPlayer';
@@ -49,6 +49,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   protected callUpdateInterval: NodeJS.Timeout;
   protected toggleVisible: HTMLSpanElement;
   protected passwordVisible: boolean;
+  protected list: ListenerSetter;
 
   protected keyUrlController: KeyUrlElementsController;
 
@@ -530,6 +531,8 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       appNavigationController.removeItem(this.navigationItem);
     }
 
+    this.listenerSetter.removeManual(rootScope, 'group_call_update', this.validateLeaveStream);
+
     this.author.avatarMiddlewareHelper?.destroy();
 
     if((window as any).appMediaViewer === this) {
@@ -550,10 +553,18 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     animationIntersector.checkAnimations2(active);
   }
 
+  protected validateLeaveStream(groupCall: GroupCall & {chatId?: string | number}) {
+    if(groupCall._ === 'groupCallDiscarded') {
+      this.leaveStream();
+    }
+  }
+
   protected setListeners() {
     [this.buttons.close, this.buttons['mobile-close']].forEach((el) => {
       attachClickEvent(el, this.leaveStream.bind(this));
     });
+
+    this.listenerSetter.add(rootScope)('group_call_update', this.validateLeaveStream);
 
     attachClickEvent(this.buttons.forward, ()=>this.onForwardClick());
     this.wholeDiv.addEventListener('click', this.onClick);
