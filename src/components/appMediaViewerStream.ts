@@ -220,6 +220,13 @@ export default class AppMediaViewerStream extends EventListenerBase<{
         });
 
         this.btnMore.classList.add('more');
+
+        this.video.muted = appMediaPlaybackController.muted
+        this.video.volume = appMediaPlaybackController.volume
+        this.listenerSetter.add(appMediaPlaybackController)('playbackParams', params=>{
+          this.video.muted = params.muted
+          this.video.volume = params.volume
+        })
       }
       this.liveTag = document.createElement('div');
       this.liveTag.classList.add('live-badge');
