@@ -8,10 +8,9 @@ import EventListenerBase from '../helpers/eventListenerBase';
 import ListenerSetter from '../helpers/listenerSetter';
 import {MiddlewareHelper, getMiddleware} from '../helpers/middleware';
 import overlayCounter from '../helpers/overlayCounter';
-import pause from '../helpers/schedulers/pause';
-import {Chat, GroupCall, InputGroupCall} from '../layer';
-import {GroupCallId} from '../lib/appManagers/appGroupCallsManager';
+import {Chat} from '../layer';
 import {AppManagers} from '../lib/appManagers/managers';
+import {LiveStream} from '../lib/calls/livestream/livestream';
 import VideoPlayer from '../lib/mediaPlayer';
 import {NULL_PEER_ID} from '../lib/mtproto/mtproto_config';
 import wrapEmojiText from '../lib/richTextProcessor/wrapEmojiText';
@@ -24,7 +23,6 @@ import ButtonIcon from './buttonIcon';
 import ButtonMenuToggle from './buttonMenuToggle';
 import GroupCallDescriptionElement from './groupCall/description';
 import PopupElement from './popups';
-import PopupForward from './popups/forward';
 import PopupPeer from './popups/peer';
 import PopupPickUser from './popups/pickUser';
 import PopupStreamControl from './popups/streamControl';
@@ -68,11 +66,15 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     status: HTMLElement
   } = {} as any;
 
-  constructor(protected peerId: PeerId, protected groupCall: InputGroupCall) {
+  constructor(protected stream: LiveStream) {
     super(false);
     this.managers = rootScope.managers;
     this.middlewareHelper = getMiddleware();
     this.listenerSetter = new ListenerSetter();
+
+    this.listenerSetter.add(this.stream)('closed', ()=>{
+      this.close()
+    })
 
     this.wholeDiv = document.createElement('div');
     this.wholeDiv.classList.add(STREAM_VIEWER_CLASSNAME + '-whole');
@@ -183,7 +185,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
         danger: true
       }]
 
-      const chat = await this.managers.appChatsManager.getChat(this.peerId.toChatId());
+      const chat = await this.managers.appChatsManager.getChat(this.stream.peerId.toChatId());
       if(chat) {
         if((chat as Chat.chat)?.pFlags?.creator) {
           this.menuButtons.splice(1, 0, {
@@ -221,7 +223,10 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       wrapper.querySelector('.btn-menu-toggle').replaceWith(this.btnMore);
 
       this.description = new GroupCallDescriptionElement(leftControls as HTMLElement);
-      this.updateCall(this.groupCall.id);
+      this.listenerSetter.add(this.stream)('fullUpdate', fullGroupCall=>{
+        if(fullGroupCall._ == 'groupCall')
+          this.description.update(fullGroupCall)
+      })
 
       player.addEventListener('toggleControls', (show) => {
         this.wholeDiv.classList.toggle('has-video-controls', show);
@@ -238,17 +243,8 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     this.wholeDiv.append(this.overlaysDiv, this.topbar);
   }
 
-  private async updateCall(groupCallId: GroupCallId) {
-    if(this.groupCall?.id !== groupCallId) return;
-    const fullGroupCall = await this.managers.appGroupCallsManager.getGroupCallFull(this.groupCall.id);
-
-    if((fullGroupCall as GroupCall.groupCall).participants_count >= 0) {
-      this.description.update(fullGroupCall as GroupCall.groupCall);
-    }
-  }
-
   private onEndLiveStream() {
-    this.managers.appChatsManager.hasRights(this.peerId.toChatId(), 'manage_call').then((hasRights) => {
+    this.managers.appChatsManager.hasRights(this.stream.peerId.toChatId(), 'manage_call').then((hasRights) => {
       if(hasRights) {
         PopupElement.createPopup(PopupPeer, 'popup-end-video-chat', {
           titleLangKey: 'VoiceChat.End.Third',
@@ -256,7 +252,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
             isDanger: true,
             langKey: 'Call.End',
             callback: async(e) => {
-              this.hangUpAndClose(true)
+              this.stream.leave(true)
             }
           }]
         }).show();
@@ -264,19 +260,16 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     })
   }
 
-  private onStreamSettings() {
-    this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtmpInfo => {
-      PopupElement.createPopup(PopupStreamControl,  'stream-settings', {
-        isStartStream: false,
-        peerId: this.peerId,
-        rtmpInfo,
-        mainBtnCallback: async() => {
-          this.validateClose()
-        }
-      }).show();
-    }).catch(e => {
-      console.error('Cant open start with window, connecting to stream')
-    });
+  private async onStreamSettings() {
+    const rtmpInfo = await this.stream.getURLAndKey()
+    PopupElement.createPopup(PopupStreamControl,  'stream-settings', {
+      isStartStream: false,
+      peerId: this.stream.peerId,
+      rtmpInfo,
+      mainBtnCallback: async() => {
+        this.validateClose()
+      }
+    }).show();
   }
 
   private onStartRecodring() {
@@ -287,81 +280,19 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
   }
 
-  private onForwardClick = () => {
-    this.managers.apiManager.invokeApi('phone.exportGroupCallInvite', {
-      can_self_unmute: false,
-      call: this.groupCall
-    }).then((text) => {
-      PopupElement.createPopup(PopupPickUser, {
-        onMultiSelect: (peerIds) => {
-          for(const peerId of peerIds) {
-            this.managers.appMessagesManager.sendText({
-              peerId,
-              text: text.link
-            });
-          }
+  private async onForwardClick() {
+    const text = await this.stream.getInvite()
+
+    PopupElement.createPopup(PopupPickUser, {
+      onMultiSelect: (peerIds) => {
+        for(const peerId of peerIds) {
+          this.managers.appMessagesManager.sendText({
+            peerId,
+            text: text.link
+          });
         }
-      })
+      }
     })
-  };
-
-
-  protected async joinStream() {
-    const rtc_data = `{
-      "fingerprints":[],
-      "pwd":"",
-      "ssrc":${Math.floor(Math.random() * 0xffffffff)},
-      "ssrc-groups":[],
-      "ufrag":""
-    }`
-
-    const joinInfo = await this.managers.appGroupCallsManager.joinGroupCall(this.groupCall.id, {
-      _: 'dataJSON',
-      data: rtc_data
-    }, {
-      type: 'main'
-    })
-
-    console.error(joinInfo)
-  }
-
-  public async startStreaming() {
-    const channels = await this.managers.appGroupCallsManager.getStreamChannels(this.groupCall);
-    console.log('AAAAAA', channels)
-
-
-    const fullCall = await this.managers.appGroupCallsManager.getGroupCallFull(this.groupCall.id);
-    const dcId = (fullCall._ == 'groupCall') ? fullCall.stream_dc_id : 0;
-
-    const channel = 1
-    const quality = 2
-    const last_time = Number(channels[channel].last_timestamp_ms);
-
-    // CHANGE THERE TO DOWNLOAD CHUNKS
-    for(let i = 0; i < 0; i++) {
-      await pause(1000);
-      const download = await this.managers.apiFileManager.download({
-        location: {
-          _: 'inputGroupCallStream',
-          call: this.groupCall,
-          scale: 0, // 1000ms
-          time_ms: last_time + i * 1000,
-          video_quality: quality,
-          video_channel: channel
-          // flags:
-        },
-        dcId
-      })
-
-      // Lemme imagine this is real
-      this.isLive = true;
-
-      console.log('STREAM DOWNLOAD', download)
-      const arbuf = await download.arrayBuffer();
-      console.log('stream buf', arbuf)
-      const baseenc = btoa(new Uint8Array(arbuf).reduce((data, byte) => data + String.fromCharCode(byte), ''));
-      console.log('stream chunk', baseenc);
-    }
   }
 
 
@@ -419,10 +350,8 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   }
 
   public async openStream() {
-    await this.joinStream();
-
     this.setListeners();
-    const setAuthorPromise = this.setAuthorInfo(this.peerId);
+    const setAuthorPromise = this.setAuthorInfo(this.stream.peerId);
     await setAuthorPromise;
 
     this.navigationItem = {
@@ -450,7 +379,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
     this.toggleWholeActive(true);
 
-    this.startStreaming();
+    this.stream.streamIntoVideo();
   }
 
   protected toggleWholeActive(active: boolean) {
@@ -464,13 +393,8 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     }
   }
 
-  private hangUpAndClose = async(discard: boolean | number) => {
-    await this.managers.appGroupCallsManager.hangUp(this.groupCall.id, discard)
-    this.close();
-  }
-
   private async validateClose() {
-    if(await this.managers.appChatsManager.hasRights(this.peerId.toChatId(), 'manage_call')) {
+    if(await this.managers.appChatsManager.hasRights(this.stream.peerId.toChatId(), 'manage_call')) {
       PopupElement.createPopup(PopupPeer, 'popup-end-video-chat', {
         titleLangKey: 'VoiceChat.End.Title',
         descriptionLangKey: 'VoiceChat.End.Text',
@@ -482,15 +406,15 @@ export default class AppMediaViewerStream extends EventListenerBase<{
           langKey: 'VoiceChat.End.OK',
           callback: async(e, checkboxes) => {
             if(!!checkboxes.size) {
-              this.hangUpAndClose(true);
+              this.stream.leave(true);
             } else {
-              this.hangUpAndClose(0)
+              this.stream.leave()
             }
           }
         }]
       }).show();
     } else {
-      this.hangUpAndClose(0)
+      this.stream.leave()
     }
   }
 
@@ -530,15 +454,8 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       attachClickEvent(el, this.leaveStream.bind(this));
     });
 
-    attachClickEvent(this.buttons.forward, this.onForwardClick);
-    this.listenerSetter.add(rootScope)('group_call_update', (groupCall) => {
-      this.updateCall(groupCall.id);
-    });
+    attachClickEvent(this.buttons.forward, ()=>this.onForwardClick());
     this.wholeDiv.addEventListener('click', this.onClick);
-
-    this.callUpdateInterval = setInterval(() => {
-      this.updateCall(this.groupCall.id)
-    }, 1e3)
   }
 
   // NOT SURE

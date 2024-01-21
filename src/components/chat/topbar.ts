@@ -61,6 +61,7 @@ import AppStatisticsTab from '../sidebarRight/tabs/statistics';
 import {ChatType} from './chat';
 import PopupStreamControl from '../popups/streamControl';
 import AppMediaViewerStream from '../appMediaViewerStream';
+import {LiveStream} from '../../lib/calls/livestream/livestream';
 
 type ButtonToVerify = {element?: HTMLElement, verify: () => boolean | Promise<boolean>};
 
@@ -641,29 +642,27 @@ export default class ChatTopbar {
   private async onJoinGroupCallClick() {
     const chatFull = await this.managers.appProfileManager.getChatFull(this.peerId.toChatId());
     if(chatFull._ === 'channelFull' && this.chat.isBroadcast && !chatFull?.call?.id) {
-      this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false).then(rtmpInfo => {
+      try {
+        const stream = new LiveStream(this.peerId);
+        const rtmpInfo = await stream.getURLAndKey()
         PopupElement.createPopup(PopupStreamControl,  'stream-with', {
           isStartStream: true,
           peerId: this.peerId,
           rtmpInfo,
           mainBtnCallback: async() => {
-            const groupCall = await this.managers.appGroupCallsManager.createGroupCall(this.peerId.toChatId(), {
-              rtmpStream: true
-            })
-            new AppMediaViewerStream(this.peerId, {
-              _: 'inputGroupCall',
-              id: groupCall.id,
-              access_hash: groupCall.access_hash
-            }).openStream();
+            await stream.join()
+            new AppMediaViewerStream(stream).openStream();
           }
         }).show();
-      }).catch(e => {
+      } catch(e) {
         console.error('Cant open start with window, connecting to stream')
         this.chat.appImManager.joinGroupCall(this.peerId);
-      });
+      }
     } else {
       if(this.joinStream.isRTMPStream) {
-        new AppMediaViewerStream(this.peerId, chatFull.call).openStream();
+        const stream = new LiveStream(this.peerId, chatFull.call);
+        await stream.join()
+        new AppMediaViewerStream(stream).openStream();
       } else {
         this.chat.appImManager.joinGroupCall(this.peerId);
       }
