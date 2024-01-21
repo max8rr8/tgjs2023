@@ -162,9 +162,6 @@ export default class AppMediaViewerStream extends EventListenerBase<{
             appMediaPlaybackController.setPictureInPicture(video);
           }
         },
-        onPipClose: () => {
-          this.leaveStream();
-        },
         showOnLeaveToClassName: 'media-viewer'
       });
 
@@ -364,10 +361,13 @@ export default class AppMediaViewerStream extends EventListenerBase<{
         if(!canAnimate && IS_MOBILE_SAFARI) {
           this.wholeDiv.remove();
         }
-
+      },
+      onEscape: () => {
         this.leaveStream();
+        return false;
       }
     };
+
     appNavigationController.pushItem(this.navigationItem);
 
     this.toggleOverlay(true);
@@ -469,18 +469,37 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     if(target.tagName === 'A') return;
     cancelEvent(e);
 
+    // if(IS_TOUCH_SUPPORTED) {
+    //   if(this.highlightSwitchersTimeout) {
+    //     clearTimeout(this.highlightSwitchersTimeout);
+    //   } else {
+    //     this.wholeDiv.classList.add('highlight-switchers');
+    //   }
+
+    //   this.highlightSwitchersTimeout = window.setTimeout(() => {
+    //     this.wholeDiv.classList.remove('highlight-switchers');
+    //     this.highlightSwitchersTimeout = 0;
+    //   }, 3e3);
+
+    //   return;
+    // }
+
     if(hasMouseMovedSinceDown(e)) {
       return;
     }
 
     let mover: HTMLElement = null;
-    const classNames = ['ckin__player', 'media-viewer-buttons', 'media-viewer-author', 'media-viewer-caption', 'zoom-container'];
+    const classNames = ['ckin__player', 'media-viewer-buttons', 'media-viewer-author'];
 
     classNames.find((s) => {
       try {
         mover = findUpClassName(target, s);
         if(mover) return true;
-      } catch(err) {return false;}
+      } catch(err) { console.error('XX err', err); return false;}
     });
+
+    if(!mover) {
+      this.close();
+    }
   };
 }
