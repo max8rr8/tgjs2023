@@ -31,23 +31,27 @@ class LiveStreamSource {
   private audioSource: SourceBuffer | undefined
   private msInit: boolean;
 
+  public localVideoTime: number;
+
   constructor(
     private managers: AppManagers,
     public stream: LiveStream,
     private channels: GroupCallStreamChannel[]
   ) {
     this.log = stream.log
-    this.nextchunkTime = performance.now()
+    this.nextchunkTime = performance.now() - 1200 // BUFFER 2 chunks
 
     this.channel = this.channels.filter((e) => e.scale >= 0)[0]
     this.chunkStep = 1000 >> channels[0].scale
     this.managers = rootScope.managers
 
+    this.localVideoTime = 0
+
     this.chunkLocation = {
       _: 'inputGroupCallStream',
       call: this.stream.groupCall,
       scale: this.channel.scale,
-      time_ms: Number(this.channel.last_timestamp_ms) - 3000,
+      time_ms: Number(this.channel.last_timestamp_ms) - 2000,
       video_quality: 2,
       video_channel: this.channel.channel
     }
@@ -64,26 +68,28 @@ class LiveStreamSource {
       this.mediaSource.addEventListener('sourceopen', () => resolve())
     )
     this.videoSource = this.mediaSource.addSourceBuffer('video/mp4; codecs="avc1.64001f";')
-    this.videoSource.mode = 'sequence'
 
     this.audioSource = this.mediaSource.addSourceBuffer('audio/webm; codecs="opus";')
     this.audioSource.mode = 'sequence'
   }
 
-  async addMp4Frag(frag: Uint8Array) {
-    const {videoBufs, videoInit, audioSamples} = await loadMP4Chunk(frag.buffer)
+  async addMp4Frag(frag: Uint8Array, time: number) {
+    const {videoBufs, videoInit, audioSamples} = await loadMP4Chunk(frag.buffer, time)
 
     if(!this.msInit) {
       this.msInit = true
       await submitSourceBuffer(this.videoSource, videoInit)
-      await submitSourceBuffer(this.audioSource, new Uint8Array(HARD_HEADER).buffer)
+      if(this.audioSource)
+        await submitSourceBuffer(this.audioSource, new Uint8Array(HARD_HEADER).buffer)
       this.video.play()
     }
 
     for(const vbuf of videoBufs) {
       await submitSourceBuffer(this.videoSource, vbuf);
     }
-    await submitSourceBuffer(this.audioSource, new Uint8Array(createOpusWebmCluster(audioSamples)))
+
+    if(this.audioSource)
+      await submitSourceBuffer(this.audioSource, new Uint8Array(createOpusWebmCluster(audioSamples)))
   }
 
   async run() {
@@ -95,15 +101,16 @@ class LiveStreamSource {
       }
       if(this.stream.closed) return;
 
-      const fetchStart = performance.now()
+      const chunkStartTime = performance.now()
       const download = await this.managers.apiFileManager.download({
         location: this.chunkLocation,
-        dcId: this.dcId
+        dcId: this.dcId,
+        noCache: true
       })
 
       if(!this.stream.isLive) this.stream.updateLive(true)
+      const chunkFetchTime=  performance.now() - chunkStartTime;
 
-      this.log('Fetched livestream chunk momemnt:', this.chunkLocation.time_ms, 'fetchTime:', performance.now() - fetchStart, 'size:', download.size)
 
       const rawChunk = new Uint8Array(await download.arrayBuffer());
       const chunk = loadChunk(rawChunk)
@@ -111,9 +118,17 @@ class LiveStreamSource {
         await this.addMp4Frag(rawChunk.slice(
           event.data.byteOffset,
           event.data.byteOffset + event.data.byteLength
-        ))
+        ), this.localVideoTime)
       }
 
+      this.log(
+        'Fetched livestream chunk momemnt:', this.chunkLocation.time_ms,
+        'fetchTime:', chunkFetchTime,
+        'fullTime:', performance.now() - chunkStartTime,
+        'size:', download.size
+      )
+
+      this.localVideoTime += this.chunkStep
       this.nextchunkTime += this.chunkStep
       this.chunkLocation.time_ms = Number(this.chunkLocation.time_ms) + this.chunkStep
     }
@@ -228,7 +243,7 @@ export class LiveStream extends EventListenerBase<{
       if(this.closed) return
 
       const channels: GroupCallStreamChannel[] = await this.managers.appGroupCallsManager.getStreamChannels(this.groupCall);
-      if(channels.length == 0) {
+      if(channels.length == 0 || Number(channels[0].last_timestamp_ms) < 5000) {
         fail = true;
         continue
       }

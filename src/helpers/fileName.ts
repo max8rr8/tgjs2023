@@ -58,7 +58,7 @@ export function getFileNameByLocation(location: InputFileLocation | InputWebFile
     }
 
     case 'inputGroupCallStream': {
-      str = ['groupCallStream', location.call.id, location.time_ms, location.time_ms, location.video_channel ?? 'nope'].join(FILENAME_JOINER);
+      str = ['groupCallStream', location.call.id, location.time_ms, location.video_channel ?? 'nope', location.video_quality ?? 'nope'].join(FILENAME_JOINER);
       break
     }
 

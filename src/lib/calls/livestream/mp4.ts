@@ -3,7 +3,7 @@ import type {MP4BOXFILE, MP4BOXINFO} from '../../../vendor/mp4box.all'
 
 let createFile: ()=>MP4BOXFILE = undefined;
 
-export async function loadMP4Chunk(videoDat: ArrayBuffer): Promise<{
+export async function loadMP4Chunk(videoDat: ArrayBuffer, time: number): Promise<{
   videoInit: ArrayBuffer,
   videoBufs: ArrayBuffer[],
   audioSamples: AudioSample[]
@@ -22,6 +22,7 @@ export async function loadMP4Chunk(videoDat: ArrayBuffer): Promise<{
     mp4boxfile.flush()
   })
 
+  const videoTrack = info.videoTracks[0]
   const videoBufsPromise = new Promise<ArrayBuffer[]>((resolve) => {
     const segments: ArrayBuffer[] = []
     mp4boxfile.onSegment = function(id, user, buffer, sampleNumber, last) {
@@ -29,9 +30,11 @@ export async function loadMP4Chunk(videoDat: ArrayBuffer): Promise<{
       if(last) resolve(segments)
     }
   })
-  mp4boxfile.setSegmentOptions(info.tracks[0].id, 123123, {})
+  mp4boxfile.getTrackById(videoTrack.id).first_dts = -time * videoTrack.timescale / 1000
+  mp4boxfile.setSegmentOptions(videoTrack.id, 123123, {})
   const initSegments = mp4boxfile.initializeSegmentation()
 
+  const audioTrack = info.audioTracks[0]
   const audioSamplesPromise = new Promise<AudioSample[]>((resolve)=>{
     mp4boxfile.onSamples = function(id, user, buffer) {
       resolve(buffer.map(e=>({
@@ -41,7 +44,7 @@ export async function loadMP4Chunk(videoDat: ArrayBuffer): Promise<{
       })))
     }
   })
-  mp4boxfile.setExtractionOptions(info.tracks[1].id, 1123, {
+  mp4boxfile.setExtractionOptions(audioTrack.id, 1123, {
     nbSamples: Infinity
   })
 

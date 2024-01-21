@@ -1,10 +1,17 @@
 // PARTIAL DEFINITIONS FOR mp4box js
 
-export type MP4BOXINFO = {
-  tracks: {
-    id: number
-  }[]
+export type MP4BOXTRAK = {
+  id: number;
+  first_dts: number;
+  timescale: number;
 }
+
+export type MP4BOXINFO = {
+  tracks: MP4BOXTRAK[],
+  videoTracks: MP4BOXTRAK[],
+  audioTracks: MP4BOXTRAK[],
+}
+
 
 type MP4BOXFILE = {
   onReady: (info: MP4BOXINFO) => void
@@ -15,6 +22,8 @@ type MP4BOXFILE = {
     timescale: number,
   }[]) => void
 
+  getTrackById: (id: number) => MP4BOXTRAK;
+  
   setExtractionOptions(id: number, user:number, options: {
     nbSamples?: number
   })

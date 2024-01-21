@@ -59,7 +59,8 @@ export type DownloadOptions = {
   limitPart?: number,
   queueId?: number,
   onlyCache?: boolean,
-  downloadId?: string
+  downloadId?: string,
+  noCache?: boolean
   // getFileMethod: Parameters<CacheStorageController['getFile']>[1]
 };
 
@@ -663,6 +664,10 @@ export class ApiFileManager extends AppManager {
 
     if(downloadStorage && process) { // then have to load file again
       getFile = downloadStorage.getFile.bind(downloadStorage);
+    }
+
+    if(options.noCache) {
+      getFile = (filename) => Promise.reject()
     }
 
     getFile(cacheFileName).then(async(blob: Blob) => {
