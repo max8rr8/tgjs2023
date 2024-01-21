@@ -175,7 +175,8 @@ export default class AppMediaViewerStream extends EventListenerBase<{
             appMediaPlaybackController.setPictureInPicture(this.video);
           }
         },
-        showOnLeaveToClassName: ''
+        showOnLeaveToClassName: '',
+        allowTogglePlay: false
       });
 
       let chat;

@@ -39,6 +39,7 @@ export default class VideoPlayer extends ControlsHover {
   protected playbackRateButton: HTMLElement;
   protected pipButton: HTMLElement;
   protected toggles: HTMLElement[];
+  protected allowTogglePlay: boolean;
 
   /* protected videoParent: HTMLElement;
   protected videoWhichChild: number; */
@@ -55,7 +56,8 @@ export default class VideoPlayer extends ControlsHover {
     onPlaybackRackMenuToggle,
     onPip,
     onPipClose,
-    showOnLeaveToClassName
+    showOnLeaveToClassName,
+    allowTogglePlay = true
   }: {
     video: HTMLVideoElement,
     play?: boolean,
@@ -64,10 +66,12 @@ export default class VideoPlayer extends ControlsHover {
     onPlaybackRackMenuToggle?: VideoPlayer['onPlaybackRackMenuToggle'],
     onPip?: VideoPlayer['onPip'],
     onPipClose?: VideoPlayer['onPipClose'],
-    showOnLeaveToClassName: string
+    showOnLeaveToClassName: string,
+    allowTogglePlay?: boolean
   }) {
     super();
 
+    this.allowTogglePlay = allowTogglePlay;
     this.video = video;
     this.wrapper = document.createElement('div');
     this.wrapper.classList.add('ckin__player');
@@ -308,7 +312,9 @@ export default class VideoPlayer extends ControlsHover {
   }
 
   protected togglePlay(isPaused = this.video.paused) {
-    this.video[isPaused ? 'play' : 'pause']();
+    if(this.allowTogglePlay) {
+      this.video[isPaused ? 'play' : 'pause']();
+    }
   }
 
   private buildControls() {
