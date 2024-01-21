@@ -59,7 +59,7 @@ import createBadge from '../../helpers/createBadge';
 import PopupBoostsViaGifts from '../popups/boostsViaGifts';
 import AppStatisticsTab from '../sidebarRight/tabs/statistics';
 import {ChatType} from './chat';
-import PopupStreamControl from '../popups/streamControl';
+import PopupStreamControl, {KeyUrlElementsController} from '../popups/streamControl';
 import AppMediaViewerStream from '../appMediaViewerStream';
 import {LiveStream} from '../../lib/calls/livestream/livestream';
 
@@ -652,10 +652,11 @@ export default class ChatTopbar {
           mainBtnCallback: async() => {
             await stream.join()
             new AppMediaViewerStream(stream).openStream();
-          }
+          },
+          keyUrlController: new KeyUrlElementsController(rtmpInfo)
         }).show();
       } catch(e) {
-        console.error('Cant open start with window, connecting to stream')
+        console.error('Cant open start with window, connecting to stream', e)
         this.chat.appImManager.joinGroupCall(this.peerId);
       }
     } else {

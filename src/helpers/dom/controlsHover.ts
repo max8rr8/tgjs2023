@@ -62,7 +62,6 @@ export default class ControlsHover extends EventListenerBase<{
       });
 
       listenerSetter.add(element)('mouseenter', () => {
-        // console.error('XX mouse enter')
         this.showControls(false);
       });
 
@@ -115,7 +114,6 @@ export default class ControlsHover extends EventListenerBase<{
       return;
     }
 
-    // console.error('XX 4')
     this.hideControlsTimeout = window.setTimeout(this.hideControls, 3e3);
   };
 

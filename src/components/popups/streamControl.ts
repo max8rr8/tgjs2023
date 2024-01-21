@@ -14,19 +14,134 @@ export type PopupStreamOptions = {
   peerId: PeerId,
   isStartStream: boolean,
   rtmpInfo: PhoneGroupCallStreamRtmpUrl.phoneGroupCallStreamRtmpUrl,
-  mainBtnCallback: () => void
+  mainBtnCallback: () => void,
+  keyUrlController: KeyUrlElementsController;
 };
+
+export class KeyUrlElementsController {
+  private streamKey: string;
+  private serverUrl: string;
+  private streamKeyEl: HTMLDivElement;
+  private serverUrlEl: HTMLDivElement;
+  private passwordVisible: boolean;
+  private toggleVisible: HTMLElement;
+  public instances: {streamKeyEl: HTMLDivElement, serverUrlEl: HTMLDivElement}[]
+
+  public fragment: HTMLDivElement;
+
+  constructor(rtmpInfo: PhoneGroupCallStreamRtmpUrl) {
+    this.instances = [];
+    this.updateKeyAndUrl(rtmpInfo)
+  }
+
+  public updateKeyAndUrl(rtmpInfo: PhoneGroupCallStreamRtmpUrl) {
+    this.serverUrl = rtmpInfo.url;
+    this.streamKey = rtmpInfo.key;
+    this.updateElements();
+  }
+
+  public getFragment() {
+    this.fragment = document.createElement('div');
+    this.createControlElement(this.fragment, {
+      rowSubtitle: 'Server URL',
+      rowTitle: this.serverUrl,
+      icon: 'link'
+    });
+    this.createControlElement(this.fragment, {
+      rowSubtitle: 'Stream Key',
+      rowTitle: this.streamKey,
+      icon: 'lock',
+      isKey: true
+    });
+    this.updateElements();
+    this.instances.push({streamKeyEl: this.streamKeyEl, serverUrlEl: this.serverUrlEl})
+    return this.fragment;
+  }
+
+  public removeFragment() {
+    if(this.instances.length) {
+      this.instances.pop();
+    }
+  }
+
+  private updateElements() {
+    this.instances.forEach(({serverUrlEl, streamKeyEl}) => {
+      serverUrlEl.replaceChildren();
+      streamKeyEl.replaceChildren();
+
+      serverUrlEl.append(this.serverUrl);
+      streamKeyEl.append(this.passwordVisible ? this.streamKey : '·'.repeat(this.streamKey.length));
+    })
+  }
+
+
+  public createControlElement(appendTo: DocumentFragment | HTMLElement, options: {
+    rowSubtitle: /* LangPackKey */ string,
+    rowTitle: string,
+    icon: Icon,
+    isKey?: true,
+  }) {
+    const rowSubtitle = document.createElement('div');
+    rowSubtitle.classList.add('row-subtitle');
+    rowSubtitle.setAttribute('dir', 'auto');
+    // TODO: this should be a call to i18n
+    rowSubtitle.append(options.rowSubtitle);
+
+    const rowTitle = document.createElement('div');
+    rowTitle.classList.add('row-title');
+    rowTitle.setAttribute('dir', 'auto');
+    rowTitle.append(this.passwordVisible || !options.isKey ? options.rowTitle : '·'.repeat(options.rowTitle.length));
+
+    if(options?.isKey) {
+      const toggleVisible = this.toggleVisible = document.createElement('span');
+      toggleVisible.classList.add('toggle-visible');
+      toggleVisible.append(Icon('eye1'));
+      rowSubtitle.append(toggleVisible);
+      toggleVisible.addEventListener('click', this.onVisibilityClick);
+      toggleVisible.addEventListener('touchend', this.onVisibilityClick);
+      this.streamKeyEl = rowTitle;
+    } else {
+      this.serverUrlEl = rowTitle;
+    }
+
+
+    const row = document.createElement('div');
+    row.classList.add('row', 'row-with-icon', 'row-with-padding');
+    row.append(Icon(options.icon, 'row-icon'), rowTitle, rowSubtitle);
+
+    const el = document.createElement('div');
+    el.classList.add('control-element');
+    const btnCopy = ButtonIcon('copy row-icon copy-icon', {noRipple: true});
+
+    el.append(row, btnCopy);
+
+    attachClickEvent(btnCopy, async() => {
+      copyTextToClipboard(options?.isKey ? this.streamKey : this.serverUrl);
+      // TODO: this should be a call with proper key
+      toast(I18n.format('PhoneCopied', true));
+    })
+
+    appendTo.append(el);
+  }
+
+  public onVisibilityClick = (e: Event) => {
+    cancelEvent(e);
+    this.passwordVisible = !this.passwordVisible;
+
+    this.toggleVisible.replaceChildren(Icon(this.passwordVisible ? 'eye2' : 'eye1'));
+    this.instances.forEach(({streamKeyEl}) => {
+      streamKeyEl.replaceChildren();
+      streamKeyEl.append(this.passwordVisible ? this.streamKey : '·'.repeat(this.streamKey.length) )
+    })
+  };
+}
 
 export default class PopupStreamControl extends PopupElement {
   private btnMain: HTMLButtonElement;
   private btnMore: HTMLElement;
-  private toggleVisible: HTMLElement;
-  private passwordVisible = false;
-  private streamKeyEl: HTMLDivElement;
-  private serverUrlEl: HTMLDivElement;
 
-  private serverURL: string;
-  private streamKey: string;
+  private keyUrlController: KeyUrlElementsController;
+
   private peerId: PeerId;
 
   // TODO: desctuctor !!!!!!!!!!!!
@@ -50,15 +165,15 @@ export default class PopupStreamControl extends PopupElement {
         text: buttonText,
         callback: () => {
           options.mainBtnCallback()
+          this.keyUrlController.removeFragment();
           this.destroy()
         }
       }],
       body: true
     });
 
-    this.serverURL = options.rtmpInfo.url;
-    this.streamKey = options.rtmpInfo.key;
     this.peerId = options.peerId;
+    this.keyUrlController = options.keyUrlController;
 
     this.btnMore = ButtonMenuToggle({
       listenerSetter: this.listenerSetter,
@@ -80,19 +195,9 @@ export default class PopupStreamControl extends PopupElement {
 
     //* body
     const fragment = document.createDocumentFragment();
-
     this.addText(fragment, 'To stream video with another app, enter these Server URL and Stream Key in your streaming app. Software encoding recommended (×264 in OBS).')
-    this.createControlElement(fragment, {
-      rowSubtitle: 'Server URL',
-      rowTitle: this.serverURL,
-      icon: 'link'
-    });
-    this.createControlElement(fragment, {
-      rowSubtitle: 'Stream Key',
-      rowTitle: this.streamKey,
-      icon: 'lock',
-      isKey: true
-    })
+    fragment.append(this.keyUrlController.getFragment());
+
     if(options?.isStartStream) {
       this.addText(fragment, 'Once you start broadcasting in your streaming app, click Start Streaming below.')
     } else {
@@ -126,14 +231,7 @@ export default class PopupStreamControl extends PopupElement {
 
   private revokeStreamKey() {
     this.managers.appGroupCallsManager.getURLAndKey(this.peerId, true).then((rtmpInfo) => {
-      this.serverURL = rtmpInfo.url;
-      this.streamKey = rtmpInfo.key;
-
-      this.serverUrlEl.replaceChildren();
-      this.streamKeyEl.replaceChildren();
-
-      this.serverUrlEl.append(this.serverURL);
-      this.streamKeyEl.append(this.passwordVisible ? this.streamKey : '·'.repeat(this.streamKey.length));
+      this.keyUrlController.updateKeyAndUrl(rtmpInfo)
     })
   }
 
@@ -145,61 +243,4 @@ export default class PopupStreamControl extends PopupElement {
     description.append(text);
     appendTo.append(description);
   }
-
-  private createControlElement(appendTo: DocumentFragment, options: {
-    rowSubtitle: /* LangPackKey */ string,
-    rowTitle: string,
-    icon: Icon,
-    isKey?: true
-  }) {
-    const rowSubtitle = document.createElement('div');
-    rowSubtitle.classList.add('row-subtitle');
-    rowSubtitle.setAttribute('dir', 'auto');
-    // TODO: this should be a call to i18n
-    rowSubtitle.append(options.rowSubtitle);
-
-    const rowTitle = document.createElement('div');
-    rowTitle.classList.add('row-title');
-    rowTitle.setAttribute('dir', 'auto');
-    rowTitle.append(this.passwordVisible || !options.isKey ? options.rowTitle : '·'.repeat(options.rowTitle.length));
-
-    if(options?.isKey) {
-      const toggleVisible = this.toggleVisible = document.createElement('span');
-      toggleVisible.classList.add('toggle-visible');
-      toggleVisible.append(Icon('eye1'));
-      rowSubtitle.append(toggleVisible);
-      toggleVisible.addEventListener('click', this.onVisibilityClick);
-      toggleVisible.addEventListener('touchend', this.onVisibilityClick);
-      this.streamKeyEl = rowTitle;
-    } else {
-      this.serverUrlEl = rowTitle;
-    }
-
-    const row = document.createElement('div');
-    row.classList.add('row', 'row-with-icon', 'row-with-padding');
-    row.append(Icon(options.icon, 'row-icon'), rowTitle, rowSubtitle);
-
-    const el = document.createElement('div');
-    el.classList.add('control-element');
-    const btnCopy = ButtonIcon('copy row-icon copy-icon', {noRipple: true});
-
-    attachClickEvent(btnCopy, () => {
-      copyTextToClipboard(options?.isKey ? this.streamKey : this.serverURL);
-      // TODO: this should be a call with proper key
-      toast(I18n.format('PhoneCopied', true));
-    })
-
-    el.append(row, btnCopy);
-
-    appendTo.append(el);
-  }
-
-  private onVisibilityClick = (e: Event) => {
-    cancelEvent(e);
-    this.passwordVisible = !this.passwordVisible;
-
-    this.toggleVisible.replaceChildren(Icon(this.passwordVisible ? 'eye2' : 'eye1'));
-    this.streamKeyEl.replaceChildren();
-    this.streamKeyEl.append(this.passwordVisible ? this.streamKey : '·'.repeat(this.streamKey.length) )
-  };
 }

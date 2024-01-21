@@ -8,7 +8,7 @@ import EventListenerBase from '../helpers/eventListenerBase';
 import ListenerSetter from '../helpers/listenerSetter';
 import {MiddlewareHelper, getMiddleware} from '../helpers/middleware';
 import overlayCounter from '../helpers/overlayCounter';
-import {Chat} from '../layer';
+import {Chat, PhoneGroupCallStreamRtmpUrl} from '../layer';
 import {AppManagers} from '../lib/appManagers/managers';
 import {LiveStream} from '../lib/calls/livestream/livestream';
 import VideoPlayer from '../lib/mediaPlayer';
@@ -22,10 +22,12 @@ import {avatarNew} from './avatarNew';
 import ButtonIcon from './buttonIcon';
 import ButtonMenuToggle from './buttonMenuToggle';
 import GroupCallDescriptionElement from './groupCall/description';
+import Icon from './icon';
 import PopupElement from './popups';
 import PopupPeer from './popups/peer';
 import PopupPickUser from './popups/pickUser';
-import PopupStreamControl from './popups/streamControl';
+import PopupStreamControl, {KeyUrlElementsController} from './popups/streamControl';
+import {putPreloader} from './putPreloader';
 import wrapPeerTitle from './wrappers/peerTitle';
 
 export const STREAM_VIEWER_CLASSNAME = 'media-viewer';
@@ -45,10 +47,21 @@ export default class AppMediaViewerStream extends EventListenerBase<{
   protected navigationItem: NavigationItem;
   protected listenerSetter: ListenerSetter;
   protected callUpdateInterval: NodeJS.Timeout;
+  protected toggleVisible: HTMLSpanElement;
+  protected passwordVisible: boolean;
+
+  protected keyUrlController: KeyUrlElementsController;
+
+  protected serverUrlEl: HTMLElement;
+  protected streamKeyEl: HTMLElement;
+
+  protected rtmpInfo: PhoneGroupCallStreamRtmpUrl;
 
   protected btnMore: HTMLElement;
   protected liveTag: HTMLDivElement;
   protected description: GroupCallDescriptionElement;
+  protected thumbnailWrap: HTMLDivElement;
+  protected animBlink: HTMLDivElement;
 
   protected pageEl = document.getElementById('page-chats') as HTMLDivElement;
   protected streamPlayer: VideoPlayer;
@@ -142,6 +155,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       const player = this.streamPlayer = new VideoPlayer({
         video: this.video,
         // streamable: supportsStreaming,
+        play: true,
         onPip: (pip) => {
           const otherMediaViewer = (window as any).appMediaViewer;
           if(!pip && otherMediaViewer && otherMediaViewer !== this) {
@@ -161,56 +175,57 @@ export default class AppMediaViewerStream extends EventListenerBase<{
             appMediaPlaybackController.setPictureInPicture(this.video);
           }
         },
-        showOnLeaveToClassName: 'media-viewer'
+        showOnLeaveToClassName: ''
       });
 
-      this.menuButtons = [{
-        icon: 'speaker',
-        // @ts-ignore
-        text: 'Output Device',
-        onClick: this.onOutputDevice.bind(this)
-      }, /* {
+      let chat;
+      if(await this.managers.appChatsManager.hasRights(this.stream.peerId.toChatId(), 'manage_call')) {
+        this.menuButtons = [{
+          icon: 'speaker',
+          // @ts-ignore
+          text: 'Output Device',
+          onClick: this.onOutputDevice.bind(this)
+        }, {
           icon: 'radioon',
+          // @ts-ignore
           text: 'Start Recording',
-          onClick: this.onStartRecodring
-        }*/ {
-        icon: 'crossround',
-        // @ts-ignore
-        text: 'End Live Stream',
-        onClick: this.onEndLiveStream.bind(this),
-        danger: true
-      }]
+          onClick: this.onStartRecodring.bind(this)
+        }, {
+          icon: 'crossround',
+          // @ts-ignore
+          text: 'End Live Stream',
+          onClick: this.onEndLiveStream.bind(this),
+          danger: true
+        }]
 
-      const chat = await this.managers.appChatsManager.getChat(this.stream.peerId.toChatId());
-      if(chat) {
-        if((chat as Chat.chat)?.pFlags?.creator) {
-          this.menuButtons.splice(1, 0, {
-            icon: 'settings',
-            // @ts-ignore
-            text: 'Stream Settings',
-            onClick: this.onStreamSettings.bind(this)
-          })
+        chat = await this.managers.appChatsManager.getChat(this.stream.peerId.toChatId());
+        if(chat) {
+          if((chat as Chat.chat)?.pFlags?.creator) {
+            this.menuButtons.splice(1, 0, {
+              icon: 'settings',
+              // @ts-ignore
+              text: 'Stream Settings',
+              onClick: this.onStreamSettings.bind(this)
+            })
+          }
         }
-      }
 
-      // TODO: fix all i18n lines
-      this.btnMore = ButtonMenuToggle({
+        // TODO: fix all i18n lines
+        this.btnMore = ButtonMenuToggle({
         // listenerSetter: this.listenerSetter,
-        direction: 'top-left',
-        buttons: this.menuButtons,
-        onOpen: async(e, element) => {
-        }
-      });
+          direction: 'top-left',
+          buttons: this.menuButtons,
+          onOpen: async(e, element) => {
+          }
+        });
 
-      this.btnMore.classList.add('more');
+        this.btnMore.classList.add('more');
+      }
       this.liveTag = document.createElement('div');
       this.liveTag.classList.add('live-badge');
       // TODO: this should be a call to i18n
       this.liveTag.innerText = 'Live';
       this.liveTag.classList.toggle('active', false);
-      this.listenerSetter.add(this.stream)('live', isLive => {
-        this.liveTag.classList.toggle('active', isLive);
-      })
 
       const wrapper = this.video.parentElement;
       const leftControls = wrapper.querySelector('.left-controls');
@@ -220,6 +235,63 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       leftControls.querySelector('.toggle').replaceWith(this.liveTag);
       wrapper.querySelector('.time').remove();
       wrapper.querySelector('.btn-menu-toggle').replaceWith(this.btnMore);
+
+      const wrap = findUpClassName(wrapper, 'media-viewer');
+
+      const img = document.createElement('img');
+      img.src = this.author.avatarEl.node.querySelector('img').src;
+      img.width = wrap.offsetWidth*0.85;
+      img.height = wrap.offsetHeight*0.75;
+      img.classList.add('thumbnail')
+
+      this.thumbnailWrap = document.createElement('div');
+      this.thumbnailWrap.classList.add('thumbnail-wrap')
+      this.thumbnailWrap.append(img);
+
+      if(chat) {
+        if((chat as Chat.chat)?.pFlags?.creator) {
+          const oopsDiv = document.createElement('div');
+          oopsDiv.classList.add('oops');
+
+
+          //* oops header
+          const preloaderWrap = document.createElement('div');
+          preloaderWrap.classList.add('preloader-circular-div');
+          putPreloader(preloaderWrap);
+          const oopsHeader = document.createElement('div');
+          oopsHeader.classList.add('oops-header');
+          // this should be a call to i18n;
+          oopsHeader.append(preloaderWrap, 'Oops!')
+
+          //* oops text
+          // this should be a call to i18n;
+          const text = document.createElement('div');
+          text.classList.add('text');
+          text.innerText = 'Telegram doesn\'t see any stream coming from your streaming app. Please make sure you entered the right Server URL and Stream Key in your app.';
+
+          oopsDiv.append(oopsHeader, text)
+
+          const rtmpInfo = await stream.getURLAndKey()
+
+          this.keyUrlController = new KeyUrlElementsController(rtmpInfo);
+          oopsDiv.append(this.keyUrlController.getFragment());
+
+          this.thumbnailWrap.append(oopsDiv)
+        }
+      }
+
+
+      this.animBlink = document.createElement('div');
+      this.animBlink.classList.add('blink-animation')
+      wrapper.append(this.thumbnailWrap, this.animBlink)
+      this.video.classList.add('hide');
+
+      this.listenerSetter.add(this.stream)('live', isLive => {
+        this.liveTag.classList.toggle('active', isLive);
+        this.video.classList.toggle('hide', !isLive);
+        this.thumbnailWrap.classList.toggle('hide', isLive);
+        this.animBlink.classList.toggle('blink-animation', !isLive);
+      })
 
       this.description = new GroupCallDescriptionElement(leftControls as HTMLElement);
       this.listenerSetter.add(this.stream)('fullUpdate', fullGroupCall=>{
@@ -241,6 +313,15 @@ export default class AppMediaViewerStream extends EventListenerBase<{
 
     this.wholeDiv.append(this.overlaysDiv, this.topbar);
   }
+
+  public onVisibilityClick = (e: Event) => {
+    cancelEvent(e);
+    this.passwordVisible = !this.passwordVisible;
+
+    this.toggleVisible.replaceChildren(Icon(this.passwordVisible ? 'eye2' : 'eye1'));
+    this.streamKeyEl.replaceChildren();
+    this.streamKeyEl.append(this.passwordVisible ? this.rtmpInfo.key : '·'.repeat(this.rtmpInfo.key.length) )
+  };
 
   private onEndLiveStream() {
     this.managers.appChatsManager.hasRights(this.stream.peerId.toChatId(), 'manage_call').then((hasRights) => {
@@ -267,7 +348,8 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       rtmpInfo,
       mainBtnCallback: async() => {
         this.validateClose()
-      }
+      },
+      keyUrlController: this.keyUrlController
     }).show();
   }
 
@@ -501,7 +583,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
     });
 
     if(!mover) {
-      this.close();
+      this.leaveStream();
     }
   };
 }

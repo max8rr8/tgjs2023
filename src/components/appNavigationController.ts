@@ -24,7 +24,7 @@ export type NavigationItem = {
 };
 
 export class AppNavigationController {
-  public navigations: Array<NavigationItem>;
+  private navigations: Array<NavigationItem>;
   private id: number;
   private manual: boolean;
   private log: ReturnType<typeof logger>;

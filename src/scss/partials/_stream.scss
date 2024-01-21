@@ -1,7 +1,21 @@
 .pinned-stream {
     --margin: 1rem;
 
+    @include respond-to(medium-screens) {
+        body.is-right-column-shown & {
+            width: calc(100% - var(--right-column-width));
+            transition: width 0.5s ease;
+
+        }
+    }
+
+    body.is-right-column-shown & {
+    } 
+
+
     &-join-btn {
+        position: relative;
+
         height: 26px;
         font-size: var(--font-size-14);
         line-height: var(--line-height-14);
