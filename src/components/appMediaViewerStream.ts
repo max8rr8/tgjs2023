@@ -247,7 +247,16 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       const wrap = findUpClassName(wrapper, 'media-viewer');
 
       const img = document.createElement('img');
-      img.src = this.author.avatarEl.node.querySelector('img').src;
+
+      const src = this.author.avatarEl.node.querySelector('img')?.src;
+
+      if(!src) {
+        img.style.backgroundColor = this.author.avatarEl.node.dataset.color;
+      } else {
+        img.src = src
+      }
+      img.classList.toggle('thumbnail-fallback', !!!src)
+
       img.width = wrap.offsetWidth*0.85;
       img.height = wrap.offsetHeight*0.75;
       img.classList.add('thumbnail')
@@ -587,7 +596,7 @@ export default class AppMediaViewerStream extends EventListenerBase<{
       try {
         mover = findUpClassName(target, s);
         if(mover) return true;
-      } catch(err) { console.error('XX err', err); return false;}
+      } catch(err) { return false;}
     });
 
     if(!mover) {
