@@ -1,47 +1,121 @@
 import EventListenerBase from '../../../helpers/eventListenerBase';
 import pause from '../../../helpers/schedulers/pause';
-import {GroupCall, GroupCallStreamChannel, InputGroupCall} from '../../../layer';
+import {GroupCall, GroupCallStreamChannel, InputFileLocation, InputGroupCall} from '../../../layer';
 import {AppManagers} from '../../appManagers/managers';
+import {LogTypes, logger} from '../../logger';
+import {DownloadOptions} from '../../mtproto/apiFileManager';
 import rootScope from '../../rootScope';
+import {HARD_HEADER, createOpusWebmCluster} from './encodeOpusWebm';
+import {loadMP4Chunk} from './mp4';
+import {loadChunk} from './tgchunks';
 
+
+function submitSourceBuffer(s: SourceBuffer, b: ArrayBuffer) {
+  const pr = new Promise<void>(resolve=>s.addEventListener('updateend', ()=>resolve()))
+  s.appendBuffer(b)
+  return pr
+}
 
 class LiveStreamSource {
-  public current_chunk: number;
+  private chunkStep: number
+  private nextchunkTime: number
+  private chunkLocation: InputFileLocation.inputGroupCallStream
+  private dcId: number
+  private channel: GroupCallStreamChannel
+  public quality: number
+  public log: ReturnType<typeof logger>;
 
-  constructor(private managers: AppManagers, public stream: LiveStream, private channels: GroupCallStreamChannel[]) {
-    console.log('STREAM Started source', channels)
-    this.current_chunk = 0;
+  public video: HTMLVideoElement
+  public mediaSource: MediaSource
+  private videoSource: SourceBuffer
+  private audioSource: SourceBuffer | undefined
+  private msInit: boolean;
+
+  constructor(
+    private managers: AppManagers,
+    public stream: LiveStream,
+    private channels: GroupCallStreamChannel[]
+  ) {
+    this.log = stream.log
+    this.nextchunkTime = performance.now()
+
+    this.channel = this.channels.filter((e) => e.scale >= 0)[0]
+    this.chunkStep = 1000 >> channels[0].scale
     this.managers = rootScope.managers
+
+    this.chunkLocation = {
+      _: 'inputGroupCallStream',
+      call: this.stream.groupCall,
+      scale: this.channel.scale,
+      time_ms: Number(this.channel.last_timestamp_ms) - 3000,
+      video_quality: 2,
+      video_channel: this.channel.channel
+    }
+    this.dcId = this.stream.groupCallFull._ == 'groupCall' ? this.stream.groupCallFull.stream_dc_id : 0;
+    this.log('Started source')
+  }
+
+  async createMediaSource(video: HTMLVideoElement) {
+    this.video = video
+    this.mediaSource = new MediaSource()
+    this.msInit = false
+    video.src = window.URL.createObjectURL(this.mediaSource)
+    await new Promise<void>((resolve) =>
+      this.mediaSource.addEventListener('sourceopen', () => resolve())
+    )
+    this.videoSource = this.mediaSource.addSourceBuffer('video/mp4; codecs="avc1.64001f";')
+    this.videoSource.mode = 'sequence'
+
+    this.audioSource = this.mediaSource.addSourceBuffer('audio/webm; codecs="opus";')
+    this.audioSource.mode = 'sequence'
+  }
+
+  async addMp4Frag(frag: Uint8Array) {
+    const {videoBufs, videoInit, audioSamples} = await loadMP4Chunk(frag.buffer)
+
+    if(!this.msInit) {
+      this.msInit = true
+      await submitSourceBuffer(this.videoSource, videoInit)
+      await submitSourceBuffer(this.audioSource, new Uint8Array(HARD_HEADER).buffer)
+      this.video.play()
+    }
+
+    for(const vbuf of videoBufs) {
+      await submitSourceBuffer(this.videoSource, vbuf);
+    }
+    await submitSourceBuffer(this.audioSource, new Uint8Array(createOpusWebmCluster(audioSamples)))
   }
 
   async run() {
-    const dcId = (this.stream.groupCallFull._ == 'groupCall') ? this.stream.groupCallFull.stream_dc_id : 0;
-
-    const channel = 1
-    const quality = 2
-    const last_time = Number(this.channels[channel].last_timestamp_ms);
-
+    this.log('Started to run')
     while(!this.stream.closed) {
-      await pause(1000);
-      // const download = await this.managers.apiFileManager.download({
-      //   location: {
-      //     _: 'inputGroupCallStream',
-      //     call: this.stream.groupCall,
-      //     scale: 0, // 1000ms
-      //     time_ms: last_time + this.current_chunk * 1000,
-      //     video_quality: quality,
-      //     video_channel: channel
-      //     // flags:
-      //   },
-      //   dcId
-      // })
+      const current_time = performance.now()
+      if(current_time < this.nextchunkTime) {
+        await pause(this.nextchunkTime - current_time)
+      }
+      if(this.stream.closed) return;
 
-      // // Lemme imagine this is real
-      // // this.isLive = true;
+      const fetchStart = performance.now()
+      const download = await this.managers.apiFileManager.download({
+        location: this.chunkLocation,
+        dcId: this.dcId
+      })
 
-      // console.log('STREAM DOWNLOAD', download)
-      // const arbuf = await download.arrayBuffer();
-      // console.log( 'stream buf', arbuf)
+      if(!this.stream.isLive) this.stream.updateLive(true)
+
+      this.log('Fetched livestream chunk momemnt:', this.chunkLocation.time_ms, 'fetchTime:', performance.now() - fetchStart, 'size:', download.size)
+
+      const rawChunk = new Uint8Array(await download.arrayBuffer());
+      const chunk = loadChunk(rawChunk)
+      for(const event of chunk.events) {
+        await this.addMp4Frag(rawChunk.slice(
+          event.data.byteOffset,
+          event.data.byteOffset + event.data.byteLength
+        ))
+      }
+
+      this.nextchunkTime += this.chunkStep
+      this.chunkLocation.time_ms = Number(this.chunkLocation.time_ms) + this.chunkStep
     }
   }
 }
@@ -49,19 +123,29 @@ class LiveStreamSource {
 export class LiveStream extends EventListenerBase<{
   closed: ()=>void
   fullUpdate: (call: GroupCall) => void
+  live: (isLive: boolean)=>void
 }> {
   protected managers: AppManagers
   public groupCall: InputGroupCall
   public groupCallFull: GroupCall
   public closed: boolean;
+  public isLive: boolean
   private fullUpdaterInterval: number
+  public log: ReturnType<typeof logger>;
 
-  constructor(public peerId: PeerId, call?: InputGroupCall) {
+  constructor(public peerId: PeerId, call?: InputGroupCall | GroupCall) {
     super()
+
+    this.log = logger('STREAM', LogTypes.Log | LogTypes.Warn | LogTypes.Debug | LogTypes.Error);
+
     this.closed = false;
     this.managers = rootScope.managers
     if(call) {
-      this.groupCall = call
+      this.groupCall = {
+        _: 'inputGroupCall',
+        id: call.id,
+        access_hash: call.access_hash
+      }
     } else {
       this.groupCall = {
         _: 'inputGroupCall',
@@ -70,6 +154,11 @@ export class LiveStream extends EventListenerBase<{
       }
     }
     this.addEventListener('closed', () => this.closed = true, {once: true})
+  }
+
+  updateLive(isLive: boolean) {
+    this.isLive = isLive
+    this.dispatchEvent('live', isLive)
   }
 
   async join() {
@@ -106,6 +195,7 @@ export class LiveStream extends EventListenerBase<{
   }
 
   async leave(finish = false) {
+    this.closed = true
     clearInterval(this.fullUpdaterInterval)
     await this.managers.appGroupCallsManager.hangUp(this.groupCall.id, finish ? true : 0)
     this.dispatchEvent('closed')
@@ -130,10 +220,13 @@ export class LiveStream extends EventListenerBase<{
     return this.managers.appGroupCallsManager.getURLAndKey(this.peerId, false)
   }
 
-  async streamIntoVideo() {
+  async streamIntoVideo(video: HTMLVideoElement) {
     let fail = false
     while(!this.closed) {
+      this.updateLive(false)
       if(fail) await pause(500);
+      if(this.closed) return
+
       const channels: GroupCallStreamChannel[] = await this.managers.appGroupCallsManager.getStreamChannels(this.groupCall);
       if(channels.length == 0) {
         fail = true;
@@ -143,12 +236,14 @@ export class LiveStream extends EventListenerBase<{
       fail = false;
 
       const source = new LiveStreamSource(this.managers, this, channels)
+      source.createMediaSource(video)
       try {
         await source.run()
       } catch(e) {
         console.error('LiveStream source failed', e)
         fail = true
       }
+      this.updateLive(false)
     }
   }
 }
