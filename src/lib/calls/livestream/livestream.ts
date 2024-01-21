@@ -1,3 +1,4 @@
+import {IS_SAFARI} from '../../../environment/userAgent';
 import EventListenerBase from '../../../helpers/eventListenerBase';
 import pause from '../../../helpers/schedulers/pause';
 import {GroupCall, GroupCallStreamChannel, InputFileLocation, InputGroupCall} from '../../../layer';
@@ -5,10 +6,11 @@ import {AppManagers} from '../../appManagers/managers';
 import {LogTypes, logger} from '../../logger';
 import {DownloadOptions} from '../../mtproto/apiFileManager';
 import rootScope from '../../rootScope';
-import {HARD_HEADER, createOpusWebmCluster} from './encodeOpusWebm';
+import {createOpusWebmCluster, createOpusWebmInit} from './encodeOpusWebm';
 import {loadMP4Chunk} from './mp4';
 import {loadChunk} from './tgchunks';
 
+const OPUS_FORCE_MONO = IS_SAFARI
 
 function submitSourceBuffer(s: SourceBuffer, b: ArrayBuffer) {
   const pr = new Promise<void>(resolve=>s.addEventListener('updateend', ()=>resolve()))
@@ -32,6 +34,7 @@ class LiveStreamSource {
   private msInit: boolean;
 
   public localVideoTime: number;
+  public currenQuality: number;
 
   constructor(
     private managers: AppManagers,
@@ -41,7 +44,7 @@ class LiveStreamSource {
     this.log = stream.log
     this.nextchunkTime = performance.now() - 1200 // BUFFER 2 chunks
 
-    this.channel = this.channels.filter((e) => e.scale >= 0)[0]
+    this.channel = this.channels.filter((e) => e.scale >= 0).find(e=>e.channel == 1)
     this.chunkStep = 1000 >> channels[0].scale
     this.managers = rootScope.managers
 
@@ -57,6 +60,16 @@ class LiveStreamSource {
     }
     this.dcId = this.stream.groupCallFull._ == 'groupCall' ? this.stream.groupCallFull.stream_dc_id : 0;
     this.log('Started source')
+  }
+
+  updateQuality(fetchTime: number) {
+    // For some reasons there are only two states
+
+    // if(fetchTime > 850 && this.chunkLocation.video_quality > 1)
+    //   this.chunkLocation.video_quality--
+
+    // if(fetchTime < 350 && this.chunkLocation.video_quality < 2)
+    //   this.chunkLocation.video_quality++
   }
 
   async createMediaSource(video: HTMLVideoElement) {
@@ -80,7 +93,7 @@ class LiveStreamSource {
       this.msInit = true
       await submitSourceBuffer(this.videoSource, videoInit)
       if(this.audioSource)
-        await submitSourceBuffer(this.audioSource, new Uint8Array(HARD_HEADER).buffer)
+        await submitSourceBuffer(this.audioSource, new Uint8Array(createOpusWebmInit(OPUS_FORCE_MONO)).buffer)
       this.video.play()
     }
 
@@ -89,7 +102,7 @@ class LiveStreamSource {
     }
 
     if(this.audioSource)
-      await submitSourceBuffer(this.audioSource, new Uint8Array(createOpusWebmCluster(audioSamples)))
+      await submitSourceBuffer(this.audioSource, new Uint8Array(createOpusWebmCluster(audioSamples, time, OPUS_FORCE_MONO)))
   }
 
   async run() {
@@ -110,7 +123,7 @@ class LiveStreamSource {
 
       if(!this.stream.isLive) this.stream.updateLive(true)
       const chunkFetchTime=  performance.now() - chunkStartTime;
-
+      this.updateQuality(chunkFetchTime)
 
       const rawChunk = new Uint8Array(await download.arrayBuffer());
       const chunk = loadChunk(rawChunk)
@@ -125,6 +138,7 @@ class LiveStreamSource {
         'Fetched livestream chunk momemnt:', this.chunkLocation.time_ms,
         'fetchTime:', chunkFetchTime,
         'fullTime:', performance.now() - chunkStartTime,
+        'quality: ', this.chunkLocation.video_quality,
         'size:', download.size
       )
 
